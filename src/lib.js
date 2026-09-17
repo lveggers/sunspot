@@ -35,13 +35,16 @@ export const atHour = (date, hour) =>
   );
 export const clock = (date) =>
   date ? formatInTimeZone(date, ZONE, "HH:mm") : "—";
-export const dateLabel = (date) =>
-  new Intl.DateTimeFormat("sv-SE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: ZONE,
-  }).format(new Date(date));
+export const dateLabel = (date, locale = "sv") =>
+  new Intl.DateTimeFormat(
+    locale === "en" ? "en-GB" : locale === "da" ? "da-DK" : "sv-SE",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: ZONE,
+    },
+  ).format(new Date(date));
 export const durationLabel = (mins) =>
   mins >= 60
     ? `${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ""}`

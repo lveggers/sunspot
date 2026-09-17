@@ -94,3 +94,8 @@ Användaren bad om motsvarande parkfilter för barer/restauranger och möjlighet
 ### 2026-09-16 — Karta som huvudvy och tidsstyrda event
 
 Användaren önskade mindre synlig information på mobil, karta i centrum och tidsreglage längst ner. Gränssnittet visar därför detaljer, filter, listor och väder först vid behov. Ett sammanhängande reglage täcker sju dagar, med daggenvägar och exakt tidsinmatning. Event använder samma markörform som platser och visas endast under sitt start-/slutintervall. I väntan på val av källa används uttryckligt märkta demo-event, utan verkliga arrangörer, bokning eller publicering.
+
+
+### 2026-09-17 — Renare karta för Bar och Mat
+
+De cirkulära utsnitten runt barer och restauranger togs bort efter mobilfeedback. Bar och Mat filtrerar fortfarande markörer och lista, men kartan visas utan nedtoningslager eller cirkulära fokusytor. Byggnadsskuggor och val av sittpunkt fungerar som tidigare. Touchgrass behåller parkernas verkliga ytor och sitt fokuslager.

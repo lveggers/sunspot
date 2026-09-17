@@ -8,7 +8,7 @@ const App = dynamic(() => import("../App.jsx"), {
   ssr: false,
   loading: () => (
     <p role="status" className="app-loading">
-      Laddar SunSpot…
+      SunSpot…
     </p>
   ),
 });

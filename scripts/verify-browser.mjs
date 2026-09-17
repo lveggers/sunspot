@@ -13,7 +13,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const ready = () =>
   page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
-const slider = () => page.getByRole("slider", { name: "Dag och tid" });
+const slider = () => page.getByRole("slider", { name: "Tid på dagen" });
 let gatheringId;
 try {
   await page.route("**/api/events?**", (route) =>
@@ -22,6 +22,7 @@ try {
   await page.addInitScript(() =>
     localStorage.setItem("sunspot:demo-events", "true"),
   );
+  await page.addInitScript(() => localStorage.setItem("sunspot:language", "sv"));
   await page.clock.setSystemTime(new Date("2026-09-21T12:00:00Z"));
   await page.goto(base, { waitUntil: "domcontentloaded" });
   await ready();
@@ -34,7 +35,7 @@ try {
   await page.getByRole("button", { name: "Om kartan", exact: true }).click();
   await page.getByRole("button", { name: "Öppna filter", exact: true }).click();
   await page
-    .getByRole("checkbox", { name: "Bara bekräftat öppet enligt OSM" })
+    .getByRole("checkbox", { name: "Bara öppet enligt tillgängliga tider" })
     .check();
   await page.getByRole("button", { name: "Visa kartan", exact: true }).click();
   await page
@@ -55,7 +56,7 @@ try {
     ["Mat", "restaurant"],
   ]) {
     await page.getByRole("button", { name: label, exact: true }).click();
-    await expect(page.locator(".venue-focus-veil")).toHaveCount(1);
+    await expect(page.locator(".venue-focus-veil")).toHaveCount(0);
     await page
       .getByRole("button", { name: "Visa platslista", exact: true })
       .click();
@@ -102,7 +103,8 @@ try {
   await expect(page.locator(".event-pin")).toHaveCount(0);
   await expect(page.locator(".event-card")).toHaveCount(0);
   await slider().fill("960");
-  await slider().fill(String(1440 + 960));
+  await page.locator(".days button").nth(1).click();
+  await slider().fill("960");
   await expect(
     page.getByRole("button", { name: "Visa Måndagshäng · demo", exact: true }),
   ).toHaveCount(0);
@@ -112,6 +114,9 @@ try {
   // Invitations use the real server clock; event fixtures above use a fixed Monday.
   await page.clock.setSystemTime(new Date());
   await page.goto(base, { waitUntil: "domcontentloaded" });
+  await ready();
+  await page.locator(".days button").nth(1).click();
+  await slider().fill("960");
   await ready();
   await page.getByRole("button", { name: "Alla", exact: true }).click();
   await page
@@ -140,6 +145,7 @@ try {
   });
   const guest = await guestContext.newPage();
   guest.on("pageerror", (e) => errors.push(e.message));
+  await guest.addInitScript(() => localStorage.setItem("sunspot:language", "sv"));
   await guest.goto(page.url(), { waitUntil: "domcontentloaded" });
   await guest
     .getByRole("textbox", { name: "Ditt namn", exact: true })
@@ -202,7 +208,7 @@ try {
     "event detail does not cover time slider",
   );
   await page.screenshot({ path: "artifacts/event-mobile.png" });
-  await slider().fill(String(1440 + 1140));
+  await slider().fill("1140");
   await expect(page.locator(".event-card")).toHaveCount(0);
   await page.getByRole("button", { name: "Öppna filter", exact: true }).click();
   await page.keyboard.press("Escape");

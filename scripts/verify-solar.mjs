@@ -9,16 +9,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 const ready = () =>
   page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
 const time = async (hour) => {
-  const dayIndex = await page
-    .locator(".days")
-    .evaluate((el) =>
-      [...el.children].findIndex(
-        (button) => button.getAttribute("aria-pressed") === "true",
-      ),
-    );
-  await page
-    .getByRole("slider")
-    .fill(String(dayIndex * 1440 + Math.round(hour * 60)));
+  await page.getByRole("slider").fill(String(Math.round(hour * 60)));
   await ready();
 };
 const filter = async (action) => {
@@ -45,6 +36,7 @@ try {
   await page.addInitScript(() =>
     localStorage.setItem("sunspot:demo-events", "true"),
   );
+  await page.addInitScript(() => localStorage.setItem("sunspot:language", "sv"));
   await page.clock.setSystemTime(new Date("2026-09-16T12:00:00Z"));
   await page.addInitScript(() => {
     window.testNotifications = [];
@@ -62,6 +54,8 @@ try {
     waitUntil: "domcontentloaded",
   });
   await ready();
+  await page.locator(".days button").nth(1).click();
+  await time(16);
   await choose("Kayak Bar");
   await time(17);
   await expect(
@@ -143,14 +137,14 @@ try {
     .click();
   await page.getByRole("textbox", { name: "Sök plats eller område" }).fill("");
   for (const hour of [9, 18, 12, 17, 16])
-    await page.getByRole("slider").fill(String(1440 + hour * 60));
+    await page.getByRole("slider").fill(String(hour * 60));
   await ready();
   await time(0);
   await expect(page.locator(".place-pin:not(.event-pin)")).toHaveCount(0);
   await time(16);
   await filter(() =>
     page
-      .getByRole("checkbox", { name: "Bara bekräftat öppet enligt OSM" })
+      .getByRole("checkbox", { name: "Bara öppet enligt tillgängliga tider" })
       .check(),
   );
   await page

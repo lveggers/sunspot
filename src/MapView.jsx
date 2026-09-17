@@ -1,16 +1,15 @@
+import { useLanguage } from "./Language.jsx";
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { mapColors } from "./theme.js";
 import { Plus, Minus, LocateFixed, Layers, Info } from "lucide-react";
 import { groupMapMarkers } from "./mapMarkers.js";
 import { atHour } from "./lib.js";
-
 import * as SunCalc from "suncalc";
 import BuildingShadowLayer from "./BuildingShadowLayer.js";
 import { parkFocusLayer, fitParkView } from "./ParkFocusLayer.js";
-import { venueFocusLayer, fitPlacesView } from "./VenueFocusLayer.js";
+import { fitPlacesView } from "./VenueFocusLayer.js";
 import { places as allPlaces } from "./places.js";
-
 export default function MapView({
   pending = false,
   category = "all",
@@ -32,6 +31,7 @@ export default function MapView({
   seatError,
   children,
 }) {
+  const { t, locale } = useLanguage();
   const touchgrass = category === "park";
   const venueFocus = category === "bar" || category === "restaurant";
   const container = useRef(null),
@@ -54,7 +54,6 @@ export default function MapView({
     }).setView([55.683, 12.581], 14);
     map.current = m;
     const registry = markers.current;
-
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -87,7 +86,13 @@ export default function MapView({
             [
               ...(pending ? lastPlaces.current : places).map((p) => {
                 const point = results[p.id]?.point;
-                return point ? { ...p, lat: point[1], lng: point[0] } : p;
+                return point
+                  ? {
+                      ...p,
+                      lat: point[1],
+                      lng: point[0],
+                    }
+                  : p;
               }),
               ...events,
             ],
@@ -128,7 +133,13 @@ export default function MapView({
               iconAnchor: [21, 42],
             }),
           }).addTo(layer.current);
-          record = { marker, button, emoji, name, item: p };
+          record = {
+            marker,
+            button,
+            emoji,
+            name,
+            item: p,
+          };
           marker.on("click", () => {
             const item = record.item;
             if (item.members) {
@@ -147,15 +158,17 @@ export default function MapView({
           registry.set(p.markerId, record);
         }
         record.item = p;
-        const signature = `${p.name}|${p.emoji}|${active}|${compact}|${results[p.id]?.state}|${p.members?.length}`;
+        const signature = `${locale}|${p.name}|${p.emoji}|${active}|${compact}|${results[p.id]?.state}|${p.members?.length}`;
         if (signature !== record.signature) {
           record.button.className = `place-pin ${p.members ? "cluster-pin" : ""} ${p.category === "event" ? "event-pin" : ""} ${active ? "active" : ""} ${results[p.id]?.state === "sun" ? "sunny" : ""} ${compact && !p.members ? "compact" : ""}`;
           record.button.setAttribute(
             "aria-label",
-            p.members ? `Zooma in: ${p.name}` : `Visa ${p.name}`,
+            p.members
+              ? t("Zooma in: {0}", [t(p.name)])
+              : t("Visa {0}", [p.name]),
           );
           record.button.title = p.members
-            ? `${p.name} · tryck för att zooma`
+            ? t("{0} · tryck för att zooma", [t(p.name)])
             : p.name;
           record.button.dataset.id = p.id;
           record.emoji.textContent = p.emoji;
@@ -174,7 +187,17 @@ export default function MapView({
     update();
     m.on("moveend zoomend resize", update);
     return () => m.off("moveend zoomend resize", update);
-  }, [places, events, selected, results, onSelect, editing, pending]);
+  }, [
+    places,
+    events,
+    selected,
+    results,
+    onSelect,
+    editing,
+    pending,
+    locale,
+    t,
+  ]);
   useEffect(() => {
     if (selected?.greenSpace && touchgrass && map.current) {
       fitParkView(map.current, selected.id);
@@ -199,12 +222,15 @@ export default function MapView({
         fillColor: colors.blue,
         fillOpacity: 1,
       })
-        .bindTooltip("Beräkningspunkt / din sittplats")
+        .bindTooltip(t("Beräkningspunkt / din sittplats"))
         .addTo(seatLayer.current);
     }
     if (!editing) return;
     const m = map.current;
-    container.current.scrollIntoView({ block: "center", behavior: "smooth" });
+    container.current.scrollIntoView({
+      block: "center",
+      behavior: "smooth",
+    });
     m.setView(point ? [point[1], point[0]] : [selected.lat, selected.lng], 18);
     const choose = (e) => onPointChange([e.latlng.lng, e.latlng.lat]);
     m.on("click", choose);
@@ -213,7 +239,7 @@ export default function MapView({
       m.off("click", choose);
       m.getContainer().style.cursor = "";
     };
-  }, [point, editing, selected, onPointChange, touchgrass]);
+  }, [point, editing, selected, onPointChange, touchgrass, t]);
   useEffect(() => {
     if (!buildings || !zones || !map.current) return;
     const shadows = new BuildingShadowLayer(
@@ -253,13 +279,6 @@ export default function MapView({
     };
   }, [touchgrass]);
   useEffect(() => {
-    if (!venueFocus || editing || !map.current) return;
-    const focus = venueFocusLayer(map.current, places, results).addTo(
-      map.current,
-    );
-    return () => focus.remove();
-  }, [venueFocus, editing, places, results]);
-  useEffect(() => {
     if (!venueFocus || !map.current) return;
     const m = map.current;
     const fit = () =>
@@ -289,12 +308,12 @@ export default function MapView({
     <section
       className={`map-shell ${editing ? "editing" : ""} ${touchgrass ? "touchgrass" : ""} ${venueFocus ? `venue-focus ${category}` : ""}`}
       data-category={category}
-      aria-label="Karta över platser i Köpenhamn"
+      aria-label={t("Karta över platser i Köpenhamn")}
     >
       <div ref={container} className="map" />
       <button
         className="map-tools-toggle"
-        aria-label="Kartverktyg"
+        aria-label={t("Kartverktyg")}
         aria-expanded={toolsOpen}
         onClick={() => setToolsOpen((v) => !v)}
       >
@@ -302,10 +321,16 @@ export default function MapView({
       </button>
       <div className={`map-tools ${toolsOpen ? "is-open" : ""}`}>
         <div className="map-controls">
-          <button onClick={() => map.current?.zoomIn()} aria-label="Zooma in">
+          <button
+            onClick={() => map.current?.zoomIn()}
+            aria-label={t("Zooma in")}
+          >
             <Plus size={19} />
           </button>
-          <button onClick={() => map.current?.zoomOut()} aria-label="Zooma ut">
+          <button
+            onClick={() => map.current?.zoomOut()}
+            aria-label={t("Zooma ut")}
+          >
             <Minus size={19} />
           </button>
           <button
@@ -320,7 +345,7 @@ export default function MapView({
                     ),
                   )
             }
-            aria-label="Visa hela området"
+            aria-label={t("Visa hela området")}
           >
             <LocateFixed size={19} />
           </button>
@@ -329,13 +354,14 @@ export default function MapView({
           <button
             className={zones ? "on" : ""}
             onClick={() => setZones(!zones)}
-            aria-label="Byggnadsskuggor"
+            aria-label={t("Byggnadsskuggor")}
             aria-pressed={zones}
           >
-            <Layers size={17} /> Skuggor
+            <Layers size={17} />
+            {t(" Skuggor")}
           </button>
           <button
-            aria-label="Om kartan"
+            aria-label={t("Om kartan")}
             aria-expanded={legendOpen}
             onClick={() => setLegendOpen((open) => !open)}
           >
@@ -347,44 +373,45 @@ export default function MapView({
         <div className="zone-note shadow-legend" role="status">
           {dataError ? (
             <>
-              <strong>Skuggdata kunde inte laddas.</strong>
-              <button onClick={onRetry}>Försök igen</button>
+              <strong>{t("Skuggdata kunde inte laddas.")}</strong>
+              <button onClick={onRetry}>{t("Försök igen")}</button>
             </>
           ) : !buildings ? (
-            <strong>Laddar byggnader…</strong>
+            <strong>{t("Laddar byggnader…")}</strong>
           ) : (
             <>
               <strong>
                 <i className="shadow-swatch" />
                 {altitude <= 0
-                  ? "Solen är under horisonten"
+                  ? t("Solen är under horisonten")
                   : altitude < 5
-                    ? "Solen är för låg för skuggmodellen"
-                    : "Mörkt = beräknad byggnadsskugga"}
+                    ? t("Solen är för låg för skuggmodellen")
+                    : t("Mörkt = beräknad byggnadsskugga")}
               </strong>
               {touchgrass && (
                 <span>
                   <i className="park-swatch" />
-                  Grönt = markerad parkyta
+                  {t("Grönt = markerad parkyta")}
                 </span>
               )}
-              <span>Höjder delvis uppskattade · träd ingår inte</span>
+              <span>{t("Höjder delvis uppskattade · träd ingår inte")}</span>
               {altitude > 0 && (
                 <span>
                   <i className="coverage-swatch" />
-                  Streckat = utanför modellens täckning
+                  {t("Streckat = utanför modellens täckning")}
                 </span>
               )}
-              <span>Ändra dag och tid för att följa skuggorna.</span>
+              <span>{t("Ändra dag och tid för att följa skuggorna.")}</span>
             </>
           )}
         </div>
       )}
       {editing && (
         <div className="seat-prompt" role="status">
-          Tryck på din sittplats utomhus, nära stället. Blå punkt används i
-          beräkningen.
-          {seatError && <p>{seatError}</p>}
+          {t(
+            "Tryck på din sittplats utomhus, nära stället. Blå punkt används i beräkningen.",
+          )}
+          {seatError && <p>{t(seatError)}</p>}
           <div>
             <button
               onClick={() => {
@@ -392,15 +419,15 @@ export default function MapView({
                 onPointChange([p.lng, p.lat]);
               }}
             >
-              Använd kartans mittpunkt
+              {t("Använd kartans mittpunkt")}
             </button>
-            <button onClick={onCancelEdit}>Avbryt punktval</button>
+            <button onClick={onCancelEdit}>{t("Avbryt punktval")}</button>
           </div>
         </div>
       )}
       {tileError && (
         <div className="map-error" role="status">
-          Kartbilder kunde inte laddas. Platserna finns i listan.
+          {t("Kartbilder kunde inte laddas. Platserna finns i listan.")}
         </div>
       )}
       {children}

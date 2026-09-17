@@ -1,6 +1,6 @@
 import * as SunCalc from "suncalc";
 import { coverageBounds, shadowOffset } from "./shadows.js";
-import { openingAt } from "./openingHours.js";
+import { placeOpening } from "./venueEvidence.js";
 const R = 6378137,
   RAD = Math.PI / 180,
   LAT = 55.6865,
@@ -306,7 +306,7 @@ export function analyzePlaces(
       until,
       reason,
       timeline,
-      opening: openingAt(place.openingHours, new Date(start), duration),
+      opening: placeOpening(place, new Date(start), duration),
       outdoor: place.outdoor,
       eligible: place.outdoor !== "no",
       park,
@@ -340,8 +340,8 @@ export function recommendNext(places, results, originId, instant, duration) {
       );
       if (!coverage.length || coverage.some((t) => t.state !== "sun"))
         return [];
-      const opening = openingAt(
-        p.openingHours,
+      const opening = placeOpening(
+        p,
         new Date(Number(new Date(instant)) + arrival * 60000),
         duration,
       );

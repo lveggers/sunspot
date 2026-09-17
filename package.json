@@ -16,7 +16,9 @@
     "data:venues": "node scripts/build-venue-data.mjs",
     "test:events": "node scripts/verify-events.mjs",
     "data:event-locations": "node scripts/import-event-locations.mjs",
-    "test:map": "node scripts/verify-map-performance.mjs"
+    "test:map": "node scripts/verify-map-performance.mjs",
+    "test:nearby": "node scripts/verify-nearby.mjs",
+    "test:i18n": "node scripts/verify-i18n.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

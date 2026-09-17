@@ -1,7 +1,7 @@
-import { formatInTimeZone } from "date-fns-tz";
+import { LanguageProvider, LanguageSelect, useLanguage } from "./Language.jsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   SlidersHorizontal,
@@ -24,6 +24,12 @@ import {
   Wind,
   X,
 } from "lucide-react";
+import NearbyPlaces from "./NearbyPlaces.jsx";
+import {
+  venueEvidence,
+  terraceLabel,
+  evidenceReviewedAt,
+} from "./venueEvidence.js";
 import MapView from "./MapView.jsx";
 import EventDetails from "./EventDetails.jsx";
 import Invite from "./Invite.jsx";
@@ -46,13 +52,32 @@ import {
   weatherAt,
   weatherText,
 } from "./lib.js";
-
 const categories = [
-  { id: "all", label: "Alla", icon: Sun },
-  { id: "park", label: "Touchgrass", icon: Sprout },
-  { id: "bar", label: "Bar", icon: Wine },
-  { id: "restaurant", label: "Mat", icon: Utensils },
-  { id: "event", label: "Event", icon: Sparkles },
+  {
+    id: "all",
+    label: "Alla",
+    icon: Sun,
+  },
+  {
+    id: "park",
+    label: "Touchgrass",
+    icon: Sprout,
+  },
+  {
+    id: "bar",
+    label: "Bar",
+    icon: Wine,
+  },
+  {
+    id: "restaurant",
+    label: "Mat",
+    icon: Utensils,
+  },
+  {
+    id: "event",
+    label: "Event",
+    icon: Sparkles,
+  },
 ];
 function WeatherIcon({ symbol = "", ...props }) {
   const Icon = symbol.includes("rain")
@@ -65,6 +90,7 @@ function WeatherIcon({ symbol = "", ...props }) {
   return <Icon {...props} />;
 }
 function Modal({ title, children, onClose, className = "" }) {
+  const { t } = useLanguage();
   const ref = useRef(null);
   useEffect(() => {
     const d = ref.current;
@@ -83,7 +109,11 @@ function Modal({ title, children, onClose, className = "" }) {
     >
       <div className="modal-top">
         <h2>{title}</h2>
-        <button className="icon-button" aria-label="Stäng" onClick={onClose}>
+        <button
+          className="icon-button"
+          aria-label={t("Stäng")}
+          onClick={onClose}
+        >
           <X size={21} />
         </button>
       </div>
@@ -92,6 +122,7 @@ function Modal({ title, children, onClose, className = "" }) {
   );
 }
 function PlaceCard({ place, selected, result, onSelect }) {
+  const { t } = useLanguage();
   return (
     <button
       className={`place-card ${selected ? "selected" : ""}`}
@@ -102,10 +133,10 @@ function PlaceCard({ place, selected, result, onSelect }) {
         <span>{place.emoji}</span>
         <small>
           {place.category === "park"
-            ? "UTE"
+            ? t("UTE")
             : place.category === "bar"
-              ? "BAR"
-              : "MAT"}
+              ? t("BAR")
+              : t("MAT")}
         </small>
       </div>
       <div className="place-copy">
@@ -114,20 +145,21 @@ function PlaceCard({ place, selected, result, onSelect }) {
           <ArrowUpRight size={17} />
         </div>
         <p>
-          {place.kind} <span>·</span> {place.district}
+          {t(place.kind)} <span>·</span> {place.district}
         </p>
         <div className={`sun-status ${result?.state === "sun" ? "" : "muted"}`}>
           <Sun size={14} />
-          {solarLabel(result)}
+          {t(solarLabel(result))}
         </div>
         <small className="opening-status">
-          {result?.opening.label || "Öppettider kontrolleras…"}
+          {t(result?.opening.label) || t("Öppettider kontrolleras…")}
         </small>
       </div>
     </button>
   );
 }
 function CreateForm({ place, date, hour, duration, onClose }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [host, setHost] = useState(""),
     [message, setMessage] = useState(""),
@@ -151,7 +183,10 @@ function CreateForm({ place, date, hour, duration, onClose }) {
       });
       const stored = save(`host:${created.id}`, created.hostToken);
       save("gatherings", [
-        { id: created.id, name: place.name },
+        {
+          id: created.id,
+          name: place.name,
+        },
         ...saved("gatherings", []),
       ]);
       if (!stored) {
@@ -168,13 +203,13 @@ function CreateForm({ place, date, hour, duration, onClose }) {
     }
   }
   return (
-    <Modal title="Samla dina vänner" onClose={onClose}>
+    <Modal title={t("Samla dina vänner")} onClose={onClose}>
       <form className="create-form" onSubmit={submit}>
         <div className="plan-summary">
           <span className="plan-emoji">{place.emoji}</span>
           <div>
             <strong>{place.name}</strong>
-            <p>{activityNames[activityFor(place.category)]}</p>
+            <p>{t(activityNames[activityFor(place.category)])}</p>
           </div>
         </div>
         <div className="plan-time">
@@ -185,50 +220,53 @@ function CreateForm({ place, date, hour, duration, onClose }) {
           <span>·</span>
           {durationLabel(duration)}
         </div>
-        <label htmlFor="host">Ditt namn</label>
+        <label htmlFor="host">{t("Ditt namn")}</label>
         <input
           id="host"
           required
           autoFocus
           autoComplete="given-name"
           maxLength={50}
-          placeholder="Till exempel Carl"
+          placeholder={t("Till exempel Carl")}
           value={host}
           onChange={(e) => setHost(e.target.value)}
         />
         <label htmlFor="message">
-          Ett meddelande <span className="optional">(valfritt)</span>
+          {t("Ett meddelande ")}
+          <span className="optional">{t("(valfritt)")}</span>
         </label>
         <textarea
           id="message"
           rows={3}
           maxLength={300}
-          placeholder="Ska vi ses här och fånga lite sol?"
+          placeholder={t("Ska vi ses här och fånga lite sol?")}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
         <p className="fineprint">
-          Du får en länk med plats, tid och möjlighet att svara. Solläget är en
-          uppskattning; ingen bordsbokning görs.
+          {t(
+            "Du får en länk med plats, tid och möjlighet att svara. Solläget är en uppskattning; ingen bordsbokning görs.",
+          )}
         </p>
         {error && (
           <p className="error" role="alert">
-            {error}
+            {t(error)}
           </p>
         )}
         <button className="primary wide" disabled={busy}>
-          {busy ? "Skapar…" : "Skapa inbjudan"}
+          {busy ? t("Skapar…") : t("Skapa inbjudan")}
           <ArrowUpRight size={19} />
         </button>
       </form>
     </Modal>
   );
 }
-
-export default function App() {
-  const [days] = useState(dayOptions);
-  const [demoEvents] = useState(() =>
-    createDemoEvents(days.map((day) => day.value)),
+function SunspotApp() {
+  const { t, locale } = useLanguage();
+  const [days, setDays] = useState(dayOptions);
+  const demoEvents = useMemo(
+    () => createDemoEvents(days.map((day) => day.value)),
+    [days],
   );
   const [showDemoEvents, setShowDemoEvents] = useState(() =>
     saved("demo-events", false),
@@ -247,8 +285,11 @@ export default function App() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [watchOpen, setWatchOpen] = useState(false);
-  const [date, setDate] = useState(days[1].value),
-    [hour, setHour] = useState(16),
+  const [date, setDate] = useState(days[0].value),
+    [hour, setHour] = useState(() => {
+      const [h, m] = clock(new Date()).split(":").map(Number);
+      return h + m / 60;
+    }),
     [duration, setDuration] = useState(90);
   const [category, setCategory] = useState("all"),
     [query, setQuery] = useState(""),
@@ -262,10 +303,15 @@ export default function App() {
   useEffect(() => {
     if (inviteId) return;
     const controller = new AbortController();
-    api("/weather", { signal: controller.signal })
+    api("/weather", {
+      signal: controller.signal,
+    })
       .then(setWeather)
       .catch((e) => {
-        if (e.name !== "AbortError") setWeather({ available: false });
+        if (e.name !== "AbortError")
+          setWeather({
+            available: false,
+          });
       })
       .finally(() => {
         if (!controller.signal.aborted) setWeatherLoading(false);
@@ -278,11 +324,16 @@ export default function App() {
     const loadEvents = () =>
       api(
         `/events?from=${encodeURIComponent(eventFrom)}&to=${encodeURIComponent(eventTo)}`,
-        { signal: controller.signal },
+        {
+          signal: controller.signal,
+        },
       )
         .then((data) => {
           if (!controller.signal.aborted)
-            setEventFeed({ ...data, loading: false });
+            setEventFeed({
+              ...data,
+              loading: false,
+            });
         })
         .catch((error) => {
           if (error.name !== "AbortError")
@@ -310,7 +361,7 @@ export default function App() {
     Number(onlyOpen);
   const [editing, setEditing] = useState(false),
     [watchId, setWatchId] = useState(null),
-    [live, setLive] = useState(false);
+    [live, setLive] = useState(true);
   const [overrides, setOverrides] = useState(() => {
     const value = saved("seats:v1") || {};
     return Object.fromEntries(
@@ -327,35 +378,34 @@ export default function App() {
       ),
     );
   });
+  const syncNow = useCallback(() => {
+    const now = new Date();
+    const today = localDate(now);
+    setDays((previous) =>
+      previous[0].value === today ? previous : dayOptions(),
+    );
+    setDate(today);
+    const [h, m] = clock(now).split(":").map(Number);
+    setHour(h + m / 60);
+  }, []);
+  const goNow = useCallback(() => {
+    syncNow();
+    setLive(true);
+  }, [syncNow]);
   useEffect(() => {
     if (!live) return;
-    const tick = () => {
-      const now = new Date();
-      setDate(localDate(now));
-      setHour(
-        Number(formatInTimeZone(now, "Europe/Copenhagen", "H")) +
-          Number(formatInTimeZone(now, "Europe/Copenhagen", "m")) / 60,
-      );
-    };
-    tick();
-    const timer = setInterval(tick, 15000);
+    const timer = setInterval(syncNow, 15000);
     const visible = () => {
-      if (document.visibilityState === "visible") tick();
+      if (document.visibilityState === "visible") syncNow();
     };
     document.addEventListener("visibilitychange", visible);
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [live]);
-  const timelineMinute =
-    Math.max(
-      0,
-      days.findIndex((day) => day.value === date),
-    ) *
-      1440 +
-    Math.round(hour * 60);
-  const timelineMax = days.length * 1440 - 5;
+  }, [live, syncNow]);
+  const timelineMinute = Math.round(hour * 60);
+  const timelineMax = 1439;
   const instant = atHour(date, hour).toISOString();
   const solar = useSolarModel(instant, overrides, duration, !inviteId);
   const results = solar.results;
@@ -411,7 +461,10 @@ export default function App() {
       }
       setSeatError("");
       setOverrides((previous) => {
-        const next = { ...previous, [selected.id]: point };
+        const next = {
+          ...previous,
+          [selected.id]: point,
+        };
         save("seats:v1", next);
         return next;
       });
@@ -477,26 +530,34 @@ export default function App() {
   return (
     <>
       <header className={`header ${!inviteId ? "map-header" : ""}`}>
-        <Link className="brand" href="/" aria-label="SunSpot startsida">
+        <Link className="brand" href="/" aria-label={t("SunSpot startsida")}>
           <span className="brand-icon">
             <Sun size={27} strokeWidth={2.1} />
           </span>
-          SunSpot<span className="beta">preview</span>
+          SunSpot<span className="beta">{t("preview")}</span>
         </Link>
         <nav aria-label="Huvudmeny">
           <Link href="/" className={!inviteId ? "nav-active" : ""}>
-            Utforska
+            {t("Utforska")}
           </Link>
           <button onClick={() => setModal("gatherings")}>
-            <Users size={16} /> Mina träffar
+            <Users size={16} />
+            {t(" Mina träffar")}
           </button>
         </nav>
         <div className="header-city">
-          <MapPin size={15} /> Köpenhamn<span className="city-flag">🇩🇰</span>
+          <MapPin size={15} />
+          {t(" Köpenhamn")}
+          <span className="city-flag">🇩🇰</span>
         </div>
       </header>
       {inviteId ? (
-        <Invite id={inviteId} />
+        <>
+          <div className="invite-language">
+            <LanguageSelect />
+          </div>
+          <Invite id={inviteId} />
+        </>
       ) : (
         <>
           <main className="map-workspace" data-solar-pending={solar.pending}>
@@ -505,15 +566,15 @@ export default function App() {
                 <div className="search-box">
                   <Search size={18} />
                   <input
-                    aria-label="Sök plats eller område"
-                    placeholder="Sök en plats eller ett område"
+                    aria-label={t("Sök plats eller område")}
+                    placeholder={t("Sök en plats eller ett område")}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   {query && (
                     <button
                       onClick={() => setQuery("")}
-                      aria-label="Rensa sökning"
+                      aria-label={t("Rensa sökning")}
                     >
                       <X size={15} />
                     </button>
@@ -521,7 +582,7 @@ export default function App() {
                 </div>
                 <button
                   className="toolbar-button"
-                  aria-label="Öppna filter"
+                  aria-label={t("Öppna filter")}
                   onClick={() => setModal("filters")}
                 >
                   <SlidersHorizontal size={19} />
@@ -531,7 +592,7 @@ export default function App() {
                 </button>
                 <button
                   className="toolbar-button"
-                  aria-label="Visa platslista"
+                  aria-label={t("Visa platslista")}
                   onClick={() => setModal("list")}
                 >
                   <List size={19} />
@@ -547,7 +608,7 @@ export default function App() {
                     onClick={() => changeCategory(id)}
                   >
                     <Icon size={17} />
-                    {label}
+                    {t(label)}
                   </button>
                 ))}
               </div>
@@ -575,10 +636,10 @@ export default function App() {
               onPointChange={choosePoint}
             >
               {detailOpen && !activeEvent && (
-                <article className="detail-card" aria-label="Vald plats">
+                <article className="detail-card" aria-label={t("Vald plats")}>
                   <button
                     className="detail-close icon-button"
-                    aria-label="Stäng plats"
+                    aria-label={t("Stäng plats")}
                     onClick={() => {
                       setDetailOpen(false);
                       setEditing(false);
@@ -588,9 +649,11 @@ export default function App() {
                   </button>
                   <div className="detail-top">
                     <span className="detail-category">
-                      {selected.kind} <span>·</span> {selected.district}
+                      {t(selected.kind)} <span>·</span> {selected.district}
                     </span>
-                    <span className="demo-badge">BERÄKNAT · OSÄKERT</span>
+                    <span className="demo-badge">
+                      {t("BERÄKNAT · OSÄKERT")}
+                    </span>
                   </div>
                   <h2>
                     {selected.name}
@@ -601,32 +664,84 @@ export default function App() {
                       <Sun size={22} />
                       <span>
                         {selected.category === "park"
-                          ? "Parkens provpunkter"
-                          : "Vald utomhuspunkt"}
+                          ? t("Parkens provpunkter")
+                          : t("Vald utomhuspunkt")}
                         <strong>
                           {solar.pending
-                            ? "Beräknar solläge…"
-                            : solarLabel(result)}
+                            ? t("Beräknar solläge…")
+                            : t(solarLabel(result))}
                         </strong>
                       </span>
                     </div>
                   </div>
+                  <div className="place-confidence">
+                    <p>
+                      {selected.category === "park"
+                        ? t("Delvis sol · trädskuggor ingår inte")
+                        : t(terraceLabel(selected))}
+                    </p>
+                    {selected.category !== "park" && (
+                      <p>
+                        {result?.pointSource === "chosen"
+                          ? t("Din valda punkt")
+                          : t("Uppskattad sittpunkt")}{" "}
+                        {t("· inte fältverifierad")}
+                      </p>
+                    )}
+                    <p>
+                      {t("Prognos:")}{" "}
+                      {forecast
+                        ? `${Math.round(forecast.temperature)}° · ${t(weatherText(forecast.symbol))}`
+                        : t("saknas")}{" "}
+                      {t("· separat från byggnadssol")}
+                    </p>
+                  </div>
                   <details className="place-more">
-                    <summary>Mer om platsen</summary>
-                    <p className="detail-description">{selected.description}</p>
+                    <summary>{t("Mer om platsen")}</summary>
+                    <p className="detail-description">
+                      {t(selected.description)}
+                    </p>
+                    {venueEvidence[selected.id] && (
+                      <p className="point-note">
+                        {t(venueEvidence[selected.id].note)}{" "}
+                        {venueEvidence[selected.id].url && (
+                          <a
+                            href={venueEvidence[selected.id].url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t("Källa:")}{" "}
+                            {venueEvidence[selected.id].sourceName ||
+                              t("ställets webbplats")}
+                          </a>
+                        )}{" "}
+                        {t("· Underlag granskat ")}
+                        {evidenceReviewedAt}
+                        {t(". Sittplatsens läge är inte verifierat.")}
+                      </p>
+                    )}
                     <p className="point-note">
                       {selected.category === "park"
                         ? result?.state === "unknown"
-                          ? "Solläget är okänt när skuggdata saknas eller solen står för lågt. Trädskuggor ingår inte."
-                          : "Delvis soliga parker finns kvar i urvalet. Trädskuggor ingår inte."
+                          ? t(
+                              "Solläget är okänt när skuggdata saknas eller solen står för lågt. Trädskuggor ingår inte.",
+                            )
+                          : t(
+                              "Delvis soliga parker finns kvar i urvalet. Trädskuggor ingår inte.",
+                            )
                         : result?.pointSource === "chosen"
-                          ? "Din valda punkt visas i blått. Höjder är delvis uppskattade."
-                          : "Blå punkt är en uppskattad utomhuspunkt, inte en verifierad uteservering."}
+                          ? t(
+                              "Din valda punkt visas i blått. Höjder är delvis uppskattade.",
+                            )
+                          : t(
+                              "Blå punkt är en uppskattad utomhuspunkt, inte en verifierad uteservering.",
+                            )}
                     </p>
                     {result && !filtered.some((p) => p.id === selected.id) && (
                       <p className="point-note">
-                        Platsen döljs av ditt filter. Det valda kortet finns
-                        kvar så att du kan följa förändringen.
+                        {t(
+                          "Platsen döljs av ditt filter. Det valda kortet finns kvar så att du kan följa förändringen.",
+                        )}
                       </p>
                     )}
                     {selected.category !== "park" && (
@@ -638,8 +753,8 @@ export default function App() {
                           }}
                         >
                           {editing
-                            ? "Avbryt punktval"
-                            : "Välj min sittplats på kartan"}
+                            ? t("Avbryt punktval")
+                            : t("Välj min sittplats på kartan")}
                         </button>
                         <button
                           disabled={
@@ -652,7 +767,7 @@ export default function App() {
                             setWatchOpen(true);
                           }}
                         >
-                          Bevaka solen här
+                          {t("Bevaka solen här")}
                         </button>
                       </div>
                     )}
@@ -662,10 +777,11 @@ export default function App() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <MapPin size={14} /> Visa platskälla
+                        <MapPin size={14} />
+                        {t(" Visa platskälla")}
                       </a>
-                      <span title={selected.openingHours || undefined}>
-                        {result?.opening.label || "Öppettider okända"}
+                      <span title={result?.opening.raw || undefined}>
+                        {t(result?.opening.label) || t("Öppettider okända")}
                       </span>
                     </div>
                   </details>
@@ -673,7 +789,7 @@ export default function App() {
                     className="primary wide"
                     onClick={() => setModal("create")}
                   >
-                    Ses här med vänner
+                    {t("Ses här med vänner")}
                     <ArrowUpRight size={20} />
                   </button>
                 </article>
@@ -683,7 +799,8 @@ export default function App() {
                   className="watch-peek"
                   onClick={() => setWatchOpen((value) => !value)}
                 >
-                  {solarLabel(results[watchId])} · Visa solbevakning
+                  {t(solarLabel(results[watchId]))}
+                  {t(" · Visa solbevakning")}
                 </button>
               )}
             </MapView>
@@ -697,7 +814,19 @@ export default function App() {
               />
             )}
 
-            <section className="time-dock controls" aria-label="Dag och tid">
+            {!detailOpen && !activeEvent && !watchId && (
+              <button
+                className="nearby-launch"
+                onClick={() => setModal("nearby")}
+              >
+                <MapPin size={18} />
+                {t(" Sol nära mig")}
+              </button>
+            )}
+            <section
+              className="time-dock controls"
+              aria-label={t("Dag och tid")}
+            >
               <div className="days">
                 {days.map((d) => (
                   <button
@@ -709,17 +838,24 @@ export default function App() {
                       setDate(d.value);
                     }}
                   >
-                    <span>{d.label}</span>
+                    <span>{t(d.label)}</span>
                     <strong>{d.day.split(" ")[0]}</strong>
                   </button>
                 ))}
               </div>
               <div className="time-label">
-                <label htmlFor="time">Dra genom veckan</label>
+                <label htmlFor="time">{t("Tid på dagen")}</label>
+                <button
+                  className="now-button"
+                  aria-pressed={live}
+                  onClick={goNow}
+                >
+                  {t("Nu")}
+                </button>
                 <input
                   className="exact-time"
                   type="time"
-                  aria-label="Exakt klockslag"
+                  aria-label={t("Exakt klockslag")}
                   step="300"
                   value={clock(atHour(date, hour))}
                   onChange={(event) => {
@@ -735,28 +871,27 @@ export default function App() {
                 type="range"
                 min="0"
                 max={timelineMax}
-                step="5"
+                step="1"
                 value={timelineMinute}
-                aria-label="Dag och tid"
-                aria-valuetext={`${days.find((day) => day.value === date)?.day} ${clock(atHour(date, hour))}`}
+                aria-label={t("Tid på dagen")}
+                aria-valuetext={`${new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "Europe/Copenhagen" }).format(atHour(date, hour))} ${clock(atHour(date, hour))}`}
                 onChange={(e) => {
                   setLive(false);
                   const minute = Number(e.target.value);
-                  setDate(days[Math.floor(minute / 1440)].value);
-                  setHour((minute % 1440) / 60);
+                  setHour(minute / 60);
                 }}
                 style={{
                   "--progress": `${(timelineMinute / timelineMax) * 100}%`,
                 }}
               />
               <div className="range-labels">
-                <span>{days[0].label} 00:00</span>
-                <span>7 dagar</span>
-                <span>{days.at(-1).day} 23:55</span>
+                <span>00:00</span>
+                <span>12:00</span>
+                <span>23:59</span>
               </div>
               <div className="timeline-status">
                 <button
-                  aria-label="Visa veckans event"
+                  aria-label={t("Visa veckans event")}
                   onClick={() => {
                     setCategory("event");
                     setModal("list");
@@ -765,25 +900,27 @@ export default function App() {
                   {category === "all" || category === "event" ? (
                     <>
                       {eventFeed.loading
-                        ? "Hämtar event…"
+                        ? t("Hämtar event…")
                         : eventFeed.message
-                          ? "Eventkälla saknas / äldre data"
-                          : `${visibleEvents.length} event nu · se veckan`}{" "}
+                          ? t("Eventkälla saknas / äldre data")
+                          : t("{0} event nu · se veckan", [
+                              visibleEvents.length,
+                            ])}{" "}
                       {showDemoEvents && (
-                        <span className="demo-label">inkl. demo</span>
+                        <span className="demo-label">{t("inkl. demo")}</span>
                       )}
                     </>
                   ) : (
-                    `${filtered.length} platser`
+                    t("{0} platser", [filtered.length])
                   )}
                 </button>
                 <button
                   onClick={() => setModal("weather")}
-                  aria-label="Visa väderprognos"
+                  aria-label={t("Visa väderprognos")}
                 >
                   {forecast
-                    ? `${Math.round(forecast.temperature)}° · ${weatherText(forecast.symbol)}`
-                    : "Väder saknas"}{" "}
+                    ? `${Math.round(forecast.temperature)}° · ${t(weatherText(forecast.symbol))}`
+                    : t("Väder saknas")}{" "}
                   <CloudSun size={14} />
                 </button>
               </div>
@@ -795,7 +932,8 @@ export default function App() {
                 className="watch-minimize"
                 onClick={() => setWatchOpen(false)}
               >
-                Tillbaka till kartan <X size={14} />
+                {t("Tillbaka till kartan ")}
+                <X size={14} />
               </button>
               <SolarWatch
                 id={watchId}
@@ -806,13 +944,14 @@ export default function App() {
                 pending={solar.pending}
                 onStop={() => setWatchId(null)}
                 onSelect={selectPlace}
-                onLive={() => setLive(true)}
+                onLive={goNow}
               />
             </div>
           )}
           {modal === "filters" && (
-            <Modal title="Filter" onClose={() => setModal(null)}>
+            <Modal title={t("Filter")} onClose={() => setModal(null)}>
               <div className="filter-panel controls">
+                <LanguageSelect />
                 <div className="solar-filters">
                   <label>
                     <input
@@ -820,7 +959,7 @@ export default function App() {
                       checked={onlySun}
                       onChange={(e) => setOnlySun(e.target.checked)}
                     />
-                    Dölj skugga och stängda platser
+                    {t("Dölj skugga och stängda platser")}
                   </label>
                   <label>
                     <input
@@ -828,7 +967,7 @@ export default function App() {
                       checked={onlyOpen}
                       onChange={(e) => setOnlyOpen(e.target.checked)}
                     />
-                    Bara bekräftat öppet enligt OSM
+                    {t("Bara öppet enligt tillgängliga tider")}
                   </label>
                   <label>
                     <input
@@ -839,23 +978,27 @@ export default function App() {
                         save("demo-events", e.target.checked);
                       }}
                     />
-                    Visa demo-event
+                    {t("Visa demo-event")}
                   </label>
                   <button
                     className="text-button"
                     aria-pressed={live}
-                    onClick={() => setLive((v) => !v)}
+                    onClick={() => (live ? setLive(false) : goNow())}
                   >
-                    {live ? "● Följer klockan · pausa" : "Följ klockan nu"}
+                    {live
+                      ? t("● Följer klockan · pausa")
+                      : t("Följ klockan nu")}
                   </button>
                 </div>
                 <p className="fineprint">
-                  Sol och öppettider filtrerar platser. Event visas under sin
-                  start- och sluttid.
+                  {t(
+                    "Sol och öppettider filtrerar platser. Event visas under sin start- och sluttid.",
+                  )}
                 </p>
                 <div className="duration-row">
                   <label htmlFor="duration">
-                    <Clock3 size={15} /> Tid tillsammans
+                    <Clock3 size={15} />
+                    {t(" Tid tillsammans")}
                   </label>
                   <select
                     id="duration"
@@ -876,22 +1019,24 @@ export default function App() {
                     setModal(null);
                   }}
                 >
-                  Visa allt — ta bort alla filter
+                  {t("Visa allt — ta bort alla filter")}
                 </button>
                 <button className="primary wide" onClick={() => setModal(null)}>
-                  Visa kartan <ChevronRight size={18} />
+                  {t("Visa kartan ")}
+                  <ChevronRight size={18} />
                 </button>
                 <button
                   className="text-button mobile-gatherings"
                   onClick={() => setModal("gatherings")}
                 >
-                  <Users size={16} /> Mina träffar
+                  <Users size={16} />
+                  {t(" Mina träffar")}
                 </button>
                 <button
                   className="text-button"
                   onClick={() => setModal("about")}
                 >
-                  Om förhandsvisningen
+                  {t("Om förhandsvisningen")}
                 </button>
               </div>
             </Modal>
@@ -899,7 +1044,9 @@ export default function App() {
           {modal === "list" && (
             <Modal
               title={
-                category === "event" ? "Event denna vecka" : "Platser just nu"
+                category === "event"
+                  ? t("Event denna vecka")
+                  : t("Platser just nu")
               }
               onClose={() => setModal(null)}
             >
@@ -908,10 +1055,10 @@ export default function App() {
                   <div className="results-heading">
                     <h2>
                       {solar.pending
-                        ? "Beräknar solläge…"
-                        : `${filtered.length} platser att upptäcka`}
+                        ? t("Beräknar solläge…")
+                        : t("{0} platser att upptäcka", [filtered.length])}
                     </h2>
-                    <span>Byggnadsskuggor</span>
+                    <span>{t("Byggnadsskuggor")}</span>
                   </div>
                   <div className="place-list">
                     {filtered.map((p) => (
@@ -928,42 +1075,45 @@ export default function App() {
                       !solar.pending && (
                         <div className="empty-state">
                           <Search size={26} />
-                          <h3>Ingen plats hittades</h3>
+                          <h3>{t("Ingen plats hittades")}</h3>
                           <p>
                             {solar.error
-                              ? "Skuggdata kunde inte laddas. Försök igen på kartan."
-                              : "Prova en annan tid eller visa även skugga och stängda platser."}
+                              ? t(
+                                  "Skuggdata kunde inte laddas. Försök igen på kartan.",
+                                )
+                              : t(
+                                  "Prova en annan tid eller visa även skugga och stängda platser.",
+                                )}
                           </p>
                           <button
                             className="text-button"
                             onClick={clearFilters}
                           >
-                            Återställ sökningen
+                            {t("Återställ sökningen")}
                           </button>
                         </div>
                       )}
                   </div>
                   <p className="list-note">
-                    <Info size={13} /> Beräknad byggnadssol. Barers
-                    utomhuspunkter är uppskattade tills du väljer sittplats.
-                    Parkers provpunkter tar hänsyn till byggnader och
-                    registrerat vatten, inte träd. Okända sollägen och
-                    öppettider är märkta.
+                    <Info size={13} />
+                    {t(
+                      " Beräknad byggnadssol. Barers utomhuspunkter är uppskattade tills du väljer sittplats. Parkers provpunkter tar hänsyn till byggnader och registrerat vatten, inte träd. Okända sollägen och öppettider är märkta.",
+                    )}
                   </p>
                 </section>
               )}
               {(category === "all" || category === "event") && (
                 <>
                   <div className="event-list-heading">
-                    <h3>Event denna vecka</h3>
+                    <h3>{t("Event denna vecka")}</h3>
                     <span>{matchingEvents.length}</span>
                   </div>
                   {eventFeed.loading && (
-                    <p role="status">Hämtar event från Köpenhamn…</p>
+                    <p role="status">{t("Hämtar event från Köpenhamn…")}</p>
                   )}
                   {eventFeed.message && (
                     <p className="fineprint" role="status">
-                      {eventFeed.message}
+                      {t(eventFeed.message)}
                     </p>
                   )}
                   <div className="event-list">
@@ -995,13 +1145,31 @@ export default function App() {
                 !matchingEvents.length &&
                 !eventFeed.loading && (
                   <p className="fineprint">
-                    Inga event hittades för den här veckan och sökningen.
+                    {t("Inga event hittades för den här veckan och sökningen.")}
                   </p>
                 )}
             </Modal>
           )}
+          {modal === "nearby" && (
+            <Modal title={t("Sol nära mig")} onClose={() => setModal(null)}>
+              <NearbyPlaces
+                places={matching}
+                results={results}
+                instant={instant}
+                pending={solar.pending}
+                error={solar.error}
+                forecast={forecast}
+                onlyOpen={onlyOpen}
+                onNow={goNow}
+                onSelect={selectPlace}
+              />
+            </Modal>
+          )}
           {modal === "weather" && (
-            <Modal title="Väder för vald tid" onClose={() => setModal(null)}>
+            <Modal
+              title={t("Väder för vald tid")}
+              onClose={() => setModal(null)}
+            >
               <div className="weather-card">
                 <div className="weather-top">
                   <div className="weather-icon">
@@ -1014,10 +1182,10 @@ export default function App() {
                   <div>
                     <strong>
                       {weatherLoading
-                        ? "Hämtar väder…"
+                        ? t("Hämtar väder…")
                         : forecast
-                          ? `${Math.round(forecast.temperature)}° · ${weatherText(forecast.symbol)}`
-                          : "Väderprognos saknas"}
+                          ? `${Math.round(forecast.temperature)}° · ${t(weatherText(forecast.symbol))}`
+                          : t("Väderprognos saknas")}
                     </strong>
                     <p>
                       {forecast ? (
@@ -1027,9 +1195,9 @@ export default function App() {
                           {forecast.rain ?? "—"} mm / {forecast.hours} h
                         </>
                       ) : weather?.available ? (
-                        "Utanför prognosens tidsintervall"
+                        t("Utanför prognosens tidsintervall")
                       ) : (
-                        "För vald tid i Köpenhamn"
+                        t("För vald tid i Köpenhamn")
                       )}
                     </p>
                   </div>
@@ -1040,19 +1208,21 @@ export default function App() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Väder: MET Norway
+                    {t("Väder: MET Norway")}
                   </a>
                   <span>
                     {weather?.stale
-                      ? "Äldre prognos"
+                      ? t("Äldre prognos")
                       : weather?.available
-                        ? `Uppd. ${clock(new Date(weather.updatedAt))}`
-                        : "Yr / MET-spåret"}
+                        ? t("Uppd. {0}", [clock(new Date(weather.updatedAt))])
+                        : t("Yr / MET-spåret")}
                   </span>
                 </div>
               </div>
               <p className="fineprint">
-                Solnedgång {clock(sunset)} · Köpenhamn
+                {t("Solnedgång ")}
+                {clock(sunset)}
+                {t(" · Köpenhamn")}
               </p>
             </Modal>
           )}
@@ -1068,15 +1238,19 @@ export default function App() {
         />
       )}
       {modal === "about" && (
-        <Modal title="En första titt på SunSpot" onClose={() => setModal(null)}>
+        <Modal
+          title={t("En första titt på SunSpot")}
+          onClose={() => setModal(null)}
+        >
           <div className="about-content">
             <p>
-              Utforska Köpenhamn, välj aktivitet och tid och skapa en träff med
-              dina vänner.
+              {t(
+                "Utforska Köpenhamn, välj aktivitet och tid och skapa en träff med dina vänner.",
+              )}
             </p>
-            <h3>Det här är riktig data</h3>
+            <h3>{t("Det här är riktig data")}</h3>
             <p>
-              Platsnamn och kartpositioner kommer från{" "}
+              {t("Platsnamn och kartpositioner kommer från")}{" "}
               <a
                 href="https://www.openstreetmap.org/copyright"
                 target="_blank"
@@ -1084,12 +1258,12 @@ export default function App() {
               >
                 OpenStreetMap
               </a>{" "}
-              (ODbL). Väder hämtas från{" "}
+              {t("(ODbL). Väder hämtas från")}{" "}
               <a href="https://www.met.no/" target="_blank" rel="noreferrer">
                 MET Norway
               </a>{" "}
-              (Norsk lisens for offentlige data / CC BY 4.0). Evenemang hämtas
-              från{" "}
+              (Norsk lisens for offentlige data / CC BY 4.0).{" "}
+              {t("Evenemang hämtas från")}{" "}
               <a
                 href="https://bibliotek.kk.dk/"
                 target="_blank"
@@ -1097,41 +1271,37 @@ export default function App() {
               >
                 Københavns Biblioteker
               </a>
-              &apos;s öppna API. Soluppgång och solnedgång beräknas med
-              SunCalc.
+              {t(
+                " – öppet API. Soluppgång och solnedgång beräknas med SunCalc.",
+              )}
             </p>
-            <h3>Beräknade byggnadsskuggor</h3>
+            <h3>{t("Beräknade byggnadsskuggor")}</h3>
             <p>
-              Kartans mörka lager följer vald dag och tid. Det beräknas från
-              OpenStreetMaps byggnadskonturer och solens position. Där angiven
-              höjd saknas används våningsantal × 3 meter, annars 12 meter. Träd,
-              terräng och detaljerade takformer ingår inte. Streckade ytor
-              ligger utanför modellens täckning. Moln visas bara i
-              väderprognosen.
+              {t(
+                "Kartans mörka lager följer vald dag och tid. Det beräknas från OpenStreetMaps byggnadskonturer och solens position. Där angiven höjd saknas används våningsantal × 3 meter, annars 12 meter. Träd, terräng och detaljerade takformer ingår inte. Streckade ytor ligger utanför modellens täckning. Moln visas bara i väderprognosen.",
+              )}
             </p>
-            <h3>Urvalet följer solen</h3>
+            <h3>{t("Urvalet följer solen")}</h3>
             <p>
-              Kort och karta använder samma byggnadsmodell. Barer bedöms vid en
-              uppskattad eller självvald utomhuspunkt. Parker provtas över ytan
-              och behålls vid delvis sol. Öppettider kommer från OSM; okända
-              eller ej tolkbara tider anges som okända. Modellen är inte
-              fältverifierad.
+              {t(
+                "Kort och karta använder samma byggnadsmodell. Barer bedöms vid en uppskattad eller självvald utomhuspunkt. Parker provtas över ytan och behålls vid delvis sol. Öppettider kommer från OSM och daterade kontroller av ställenas egna webbplatser; okända eller ej tolkbara tider anges som okända. Modellen är inte fältverifierad.",
+              )}
             </p>
-            <h3>Träffar fungerar lokalt</h3>
+            <h3>{t("Träffar fungerar lokalt")}</h3>
             <p>
-              Inbjudningar och gästsvar sparas. Länkar fungerar på den här
-              datorn; publik delning och verifierade soltider per plats är nästa
-              steg.
+              {t(
+                "Inbjudningar och gästsvar sparas i den lokala versionen. Den hostade versionen behöver en gemensam databas för delade träffar. Solinformationen är en uppskattning.",
+              )}
             </p>
             <button className="primary wide" onClick={() => setModal(null)}>
-              Utforska SunSpot
+              {t("Utforska SunSpot")}
               <ChevronRight size={18} />
             </button>
           </div>
         </Modal>
       )}
       {modal === "gatherings" && (
-        <Modal title="Mina träffar" onClose={() => setModal(null)}>
+        <Modal title={t("Mina träffar")} onClose={() => setModal(null)}>
           <div className="my-gatherings">
             {saved("gatherings", []).length ? (
               saved("gatherings", []).map((g) => (
@@ -1144,18 +1314,28 @@ export default function App() {
             ) : (
               <div className="empty-state">
                 <Users size={30} />
-                <h3>Det börjar med en plats.</h3>
+                <h3>{t("Det börjar med en plats.")}</h3>
                 <p>
-                  Välj ett ställe på kartan och bjud in till din första träff.
+                  {t(
+                    "Välj ett ställe på kartan och bjud in till din första träff.",
+                  )}
                 </p>
               </div>
             )}
             <p className="fineprint">
-              Här visas träffar som du skapat i den här webbläsaren.
+              {t("Här visas träffar som du skapat i den här webbläsaren.")}
             </p>
           </div>
         </Modal>
       )}
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <SunspotApp />
+    </LanguageProvider>
   );
 }

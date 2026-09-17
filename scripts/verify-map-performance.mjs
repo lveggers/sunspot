@@ -33,6 +33,7 @@ async function open(fallback = false) {
     reducedMotion: "reduce",
   });
   page.on("pageerror", (e) => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem("sunspot:language", "sv"));
   await page.clock.setSystemTime(new Date("2026-09-17T12:00:00Z"));
   if (fallback)
     await page.addInitScript(() => {
@@ -42,6 +43,9 @@ async function open(fallback = false) {
     r.fulfill({ json: { events: [], available: true, stale: false } }),
   );
   await page.goto(base, { waitUntil: "domcontentloaded" });
+  await ready(page);
+  await page.locator(".days button").nth(1).click();
+  await page.getByRole("slider").fill("960");
   await ready(page);
   return page;
 }
@@ -137,7 +141,7 @@ try {
       "value",
     ).set;
     for (let i = 0; i < 45; i++) {
-      setter.call(slider, 1440 + 600 + i * 10);
+      setter.call(slider, 600 + i * 10);
       slider.dispatchEvent(new Event("input", { bubbles: true }));
       await new Promise((r) => setTimeout(r, 30));
     }
@@ -153,7 +157,7 @@ try {
     "data-instant",
     "2026-09-18T15:20:00.000Z",
   );
-  await page.getByRole("slider", { name: "Dag och tid" }).fill("1440");
+  await page.getByRole("slider", { name: "Tid på dagen" }).fill("0");
   await ready(page);
   await expect(page.locator(".building-shadows")).toHaveAttribute(
     "data-mode",
