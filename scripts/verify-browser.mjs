@@ -13,6 +13,14 @@ const context = await browser.newContext({
   timezoneId: "Europe/Copenhagen",
 });
 const errors = [];
+const expandFinder = async (target) => {
+  const toggle = target.getByRole("button", {
+    name: "Vælg sted og tid",
+    exact: true,
+  });
+  if (await toggle.isVisible()) await toggle.click();
+};
+
 const page = await context.newPage();
 page.on("pageerror", (error) => errors.push(error.message));
 const eventRequests = [];
@@ -85,6 +93,7 @@ let hostToken;
 try {
   await mkdir("artifacts", { recursive: true });
   await open();
+  await expandFinder(page);
   await expect(
     page.getByRole("combobox", { name: "Dag", exact: true }),
   ).toHaveValue("2026-10-27");
@@ -129,6 +138,7 @@ try {
   await page
     .getByRole("button", { name: "Ändra sökning", exact: true })
     .click();
+  await expandFinder(page);
   await page.getByRole("button", { name: "Bar", exact: true }).click();
   await page.locator("#district").selectOption("Nørrebro");
   await find();

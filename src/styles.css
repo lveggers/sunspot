@@ -1,20 +1,21 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Fraunces:opsz,wght@9..144,400..800&family=Manrope:wght@400;500;600;650;700;750;800&display=swap");
 
 :root {
-  /* Brand palette from Sunspot Color palette.pdf. */
-  --blue: #567ea9;
-  --sky: #94b7fc;
-  --grass: #9dc471;
-  --yellow: #ffdd6f;
-  --cream: #fff8cd;
-  /* Supporting tones keep small text readable on the brand surfaces. */
-  --ink: #243a52;
-  --muted: #4c627a;
-  --surface: #fff;
-  --surface-overlay: #fffffff2;
-  --surface-soft: color-mix(in srgb, var(--sky) 10%, white);
-  --line: color-mix(in srgb, var(--blue) 28%, white);
-  --yellow-hover: color-mix(in srgb, var(--yellow) 88%, var(--cream));
+  /* Copenhagen paper theatre: cream stock, pine ink, sage and late sunlight. */
+  --blue: #496c57;
+  --sky: #ced9d6;
+  --grass: #9aaa87;
+  --yellow: #e8b94d;
+  --cream: #f3eddf;
+  --ink: #293c31;
+  --muted: #637061;
+  --surface: #fffdf5;
+  --surface-overlay: #fffdf5f5;
+  --surface-soft: #eaece1;
+  --line: #d8d3c2;
+  --yellow-hover: #e2af3f;
+  --golden-coral: #c98e73;
+  --font-display: "Fraunces", Georgia, serif;
   font-family: "DM Sans", sans-serif;
   color: var(--ink);
   background: var(--cream);
@@ -89,7 +90,7 @@ textarea {
   gap: 24px;
 }
 .brand {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-display);
   font-size: 27px;
   letter-spacing: -1.4px;
   font-weight: 800;
@@ -170,7 +171,7 @@ textarea {
   color: var(--muted);
 }
 .intro-bar h1 {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-display);
   font-size: 31px;
   letter-spacing: -1.2px;
   line-height: 1.25;
@@ -311,7 +312,7 @@ textarea {
   font-size: 11px;
 }
 .days button strong {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-display);
   font-size: 16px;
   color: var(--ink);
   font-weight: 650;
@@ -335,7 +336,7 @@ textarea {
   font-weight: 550;
 }
 .time-label output {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-display);
   font-size: 17px;
   font-weight: 750;
 }
@@ -822,7 +823,7 @@ textarea {
   white-space: nowrap;
 }
 .detail-card h2 {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 750;
   letter-spacing: -0.9px;
@@ -991,7 +992,7 @@ textarea {
   margin-bottom: 24px;
 }
 .modal-top h2 {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-display);
   font-size: 22px;
   letter-spacing: -0.7px;
 }
@@ -1162,7 +1163,7 @@ textarea {
   color: var(--ink);
 }
 .invite-card h1 {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-display);
   font-size: 29px;
   letter-spacing: -1.1px;
   margin: 9px 0 12px;
@@ -2425,7 +2426,7 @@ textarea {
 .time-dock .exact-time {
   border: 0;
   background: transparent;
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-display);
   font-size: 22px;
   line-height: 1;
   font-weight: 750;
@@ -2645,7 +2646,7 @@ textarea {
   color: var(--blue);
 }
 .spot-finder h1 {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 35px;
   line-height: 1.14;
   font-weight: 800;
@@ -2955,31 +2956,20 @@ textarea {
 }
 
 /* Golden hour: paper cutouts, warm sunlight and a little more personality. */
-:root {
-  --blue: #4541d5;
-  --sky: #a8c2fb;
-  --grass: #bed688;
-  --yellow: #ffd447;
-  --cream: #fff3d8;
-  --ink: #202744;
-  --muted: #525775;
-  --surface-soft: #f4f1ff;
-  --line: #d0cddd;
-  --golden-coral: #ff8d75;
-}
+
 .map-header {
   background: var(--cream);
-  border-bottom: 2px solid var(--ink);
+  border-bottom: 1px solid var(--line);
 }
 .brand-icon {
   border: 2px solid var(--ink);
-  box-shadow: 2px 2px 0 var(--ink);
+  box-shadow: 1px 2px 0 #293c3126;
   border-radius: 11px;
 }
 .spot-finder {
   border: 2px solid var(--ink);
   border-radius: 7px 22px 9px 19px;
-  box-shadow: 5px 6px 0 var(--ink);
+  box-shadow: 3px 4px 0 #675c3c26;
 }
 .finder-eyebrow {
   color: var(--blue);
@@ -3021,8 +3011,13 @@ textarea {
   animation: golden-bob 5s ease-in-out infinite;
 }
 @keyframes golden-bob {
-  0%, 100% { transform: translateY(0) rotate(10deg); }
-  50% { transform: translateY(-5px) rotate(6deg); }
+  0%,
+  100% {
+    transform: translateY(0) rotate(10deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(6deg);
+  }
 }
 .spot-finder .finder-intro {
   margin: 3px 0 14px;
@@ -3038,13 +3033,13 @@ textarea {
 }
 .finder-section-heading h2 {
   font-size: 13px;
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   letter-spacing: -0.3px;
 }
 .finder-workspace .finder-submit {
   border: 2px solid var(--ink);
   border-radius: 9px;
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 3px 0 #675c3c26;
 }
 .golden-discovery {
   margin: 13px 0;
@@ -3059,7 +3054,7 @@ textarea {
   border-radius: 7px 14px 8px 13px;
   background: var(--golden-coral);
   text-align: left;
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 3px 0 #675c3c26;
 }
 .golden-discovery-button > span:nth-child(2) {
   flex: 1;
@@ -3070,7 +3065,7 @@ textarea {
   display: block;
 }
 .golden-discovery-button strong {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 14px;
   letter-spacing: -0.5px;
@@ -3113,7 +3108,7 @@ textarea {
   transform: rotate(-10deg);
 }
 .golden-list-intro h3 {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 28px;
   line-height: 1.1;
   letter-spacing: -1px;
@@ -3143,7 +3138,7 @@ textarea {
   margin: 0 auto 12px;
 }
 .golden-empty h3 {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 19px;
 }
 .golden-empty p {
@@ -3168,7 +3163,7 @@ textarea {
   border: 2px solid var(--ink);
   border-radius: 5px 17px 7px 17px;
   background: var(--yellow);
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 3px 0 #675c3c26;
   text-align: left;
 }
 .golden-offer-card.cocktail {
@@ -3192,7 +3187,7 @@ textarea {
 }
 .golden-offer-card strong {
   margin: 7px 0;
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 18px;
   line-height: 1.2;
   letter-spacing: -0.6px;
@@ -3240,14 +3235,14 @@ textarea {
   background: var(--surface);
   border: 2px solid var(--ink);
   transform: rotate(-5deg);
-  box-shadow: 2px 2px 0 var(--ink);
+  box-shadow: 1px 2px 0 #293c3126;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.8px;
 }
 .golden-offer-detail > h3 {
   margin: 8px 0;
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 28px;
   line-height: 1.15;
   letter-spacing: -0.9px;
@@ -3256,7 +3251,7 @@ textarea {
   display: block;
   margin: 14px 0;
   font-size: 35px;
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   letter-spacing: -1.2px;
 }
 .golden-offer-detail > p:not(.golden-kicker):not(.golden-demo) {
@@ -3281,7 +3276,7 @@ textarea {
   color: white;
   font-weight: 700;
   font-size: 13px;
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 3px 0 #675c3c26;
 }
 .golden-button > svg:last-child {
   margin-left: auto;
@@ -3352,7 +3347,7 @@ textarea {
   margin: 6px auto;
 }
 .golden-voucher h3 {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 24px;
   line-height: 1.2;
 }
@@ -3369,7 +3364,7 @@ textarea {
 }
 .golden-countdown {
   margin: 17px 0 10px;
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 54px;
   line-height: 1;
   font-weight: 800;
@@ -3429,7 +3424,7 @@ textarea {
 }
 .partner-intro h1 {
   margin: 12px 0 18px;
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 52px;
   line-height: 1.06;
@@ -3452,7 +3447,7 @@ textarea {
   background: var(--surface);
 }
 .paper-card h2 {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 24px;
   letter-spacing: -0.8px;
 }
@@ -3637,7 +3632,7 @@ textarea {
   transform: translateX(-50%);
   width: min(400px, calc(100% - 30px));
   border: 2px solid var(--ink);
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 3px 0 #675c3c26;
   background: var(--cream);
 }
 @media (max-width: 760px) {

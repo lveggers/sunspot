@@ -38,6 +38,10 @@ excluded from Git.
 
 ## What's included
 
+- A Copenhagen paper-theatre identity: six original adult characters,
+  five illustrated scenes, warm cream and sage surfaces, and a map-first
+  mobile sheet. The character gallery supports keyboard tabs and swipe.
+  [Visual system and illustration rules](docs/visual-identity.md).
 - An area, day and time finder, starting at the current Copenhagen time.
   Choose a district or search within 1.5 km of your location, then find up
   to eight ranked places on a focused map, get walking directions and
@@ -59,6 +63,9 @@ excluded from Git.
   and one-hour phone vouchers. Partner activation and new claims require
   server-verified building exposure, fresh weather and confirmed opening.
   A claimed voucher keeps its original expiry and can be redeemed once.
+- A separate interactive Golden Hour example explicitly labels simulated
+  sunshine, weather and a 10 DKK beer offer. Its ticket is not redeemable
+  and never calls the real offer-claim API.
 
 ## Partner portal
 
@@ -90,6 +97,7 @@ npm run test:browser     # requires a running app on port 3000
 npm run test:solar
 npm run test:map         # grouping, mobile layout, worker/fallback and responsiveness
 npm run test:golden-hour # offer/partner UI, sharing and server-anchored voucher states
+npm run test:identity    # artwork, scene controls, mock labels and mobile map access
 ```
 
 For browser tests, install Chromium with `npx playwright install chromium`,
@@ -106,6 +114,7 @@ docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:browse
 docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:solar
 docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:map
 docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:golden-hour
+docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:identity
 ```
 
 Use your configured port if `SUNSPOT_PORT` differs. Browser dependencies

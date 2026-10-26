@@ -7,6 +7,14 @@ const browser = await chromium.launch({
 });
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const errors = [];
+const expandFinder = async (target) => {
+  const toggle = target.getByRole("button", {
+    name: "Vælg sted og tid",
+    exact: true,
+  });
+  if (await toggle.isVisible()) await toggle.click();
+};
+
 const clearWeather = {
   available: true,
   stale: false,
@@ -142,6 +150,7 @@ try {
   await page
     .getByRole("button", { name: "Ändra sökning", exact: true })
     .click();
+  await expandFinder(page);
   await page.getByRole("button", { name: "Bar", exact: true }).click();
   await page.getByRole("button", { name: "Mat", exact: true }).click();
   await page
@@ -178,6 +187,7 @@ try {
     .click();
   await ready(page);
   const beforeWorker = await view(page);
+  await expandFinder(page);
   await page.getByLabel("Exakt klockslag").fill("13:00");
   await expect(page.locator(".building-shadows")).toHaveAttribute(
     "data-instant",
@@ -237,6 +247,7 @@ try {
   await filters(page, () =>
     page.getByRole("textbox", { name: "Sök plats eller område" }).fill(""),
   );
+  await expandFinder(page);
   await page
     .getByRole("combobox", { name: "Var?", exact: true })
     .selectOption("Kvæsthusbroen");

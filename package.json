@@ -15,7 +15,8 @@
     "data:parks": "node scripts/import-parks.mjs && npm run data:venues",
     "data:venues": "node scripts/build-venue-data.mjs",
     "test:map": "node scripts/verify-map-performance.mjs",
-    "test:golden-hour": "node scripts/verify-golden-hour.mjs"
+    "test:golden-hour": "node scripts/verify-golden-hour.mjs",
+    "test:identity": "node scripts/verify-visual-identity.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

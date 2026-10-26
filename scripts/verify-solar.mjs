@@ -6,6 +6,14 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
+const expandFinder = async (target) => {
+  const toggle = target.getByRole("button", {
+    name: "Vælg sted og tid",
+    exact: true,
+  });
+  if (await toggle.isVisible()) await toggle.click();
+};
+
 page.on("pageerror", (error) => errors.push(error.message));
 const ready = () =>
   page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
@@ -65,6 +73,7 @@ try {
   await page
     .getByRole("button", { name: "Använd filter", exact: true })
     .click();
+  await expandFinder(page);
   await page.getByLabel("Exakt klockslag").fill("16:40");
   await page
     .getByRole("button", { name: "Hitta min plats i solen", exact: true })

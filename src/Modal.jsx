@@ -7,8 +7,13 @@ export default function Modal({ title, children, onClose, className = "" }) {
   const ref = useRef(null);
   useEffect(() => {
     const d = ref.current;
+    const opener = document.activeElement;
     d.showModal();
-    return () => d.close();
+    return () => {
+      d.close();
+      if (opener instanceof HTMLElement && opener.isConnected)
+        opener.focus({ preventScroll: true });
+    };
   }, []);
   return (
     <dialog

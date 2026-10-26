@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
+import { illustrations } from "./illustrations.js";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -26,7 +28,8 @@ import {
 } from "lucide-react";
 import MapView from "./MapView.jsx";
 import Modal from "./Modal.jsx";
-import { GoldenHourArt, GoldenHourDiscovery } from "./GoldenHour.jsx";
+import { GoldenHourDiscovery } from "./GoldenHour.jsx";
+import BrandTheatre from "./BrandTheatre.jsx";
 import Invite from "./Invite.jsx";
 import * as SunCalc from "suncalc";
 import { distanceMeters } from "./exposure.js";
@@ -248,6 +251,7 @@ export default function App() {
   const [selected, setSelected] = useState(places[0]);
   const [detailOpen, setDetailOpen] = useState(false);
   const [finderOpen, setFinderOpen] = useState(true);
+  const [finderExpanded, setFinderExpanded] = useState(false);
   const [hasResults, setHasResults] = useState(false);
   const [fitResultsToken, setFitResultsToken] = useState(0);
   const [weather, setWeather] = useState(null);
@@ -451,6 +455,7 @@ export default function App() {
     setLive(true);
     setDetailOpen(false);
     setFinderOpen(true);
+    setFinderExpanded(false);
     setHasResults(false);
     setEditing(false);
   }
@@ -488,14 +493,16 @@ export default function App() {
             data-solar-pending={solar.pending}
           >
             <aside
-              className={`spot-finder ${finderOpen ? "is-expanded" : ""}`}
+              className={`spot-finder ${finderOpen ? "is-expanded" : ""} ${finderExpanded ? "controls-expanded" : "controls-compact"}`}
               aria-label="Hitta en plats i solen"
             >
               <div className="finder-brand-row">
                 <span className="finder-eyebrow">
-                  <Sun size={16} /> EN STUND I SOLEN
+                  <Sun size={16} /> SUNSPOT · KØBENHAVN
                 </span>
+                <BrandTheatre compact />
                 <button
+                  type="button"
                   className="icon-button"
                   aria-label="Mina träffar"
                   onClick={() => setModal("gatherings")}
@@ -513,25 +520,40 @@ export default function App() {
               )}
               {finderOpen ? (
                 <form onSubmit={findSpots}>
-                  <div className="golden-hero">
-                    <h1>
-                      Find your
-                      <br />
-                      <em>golden hour.</em>
-                    </h1>
-                    <GoldenHourArt kind="scene" />
+                  <div className="golden-hero paper-hero" lang="da">
+                    <div>
+                      <span className="paper-edition">LIDT MERE UDELIV</span>
+                      <h1>
+                        En plads
+                        <br />
+                        <em>i solen.</em>
+                      </h1>
+                    </div>
+                    <Image
+                      className="paper-hero-scene"
+                      src={illustrations["bench-sun"]}
+                      alt="En københavner nyder en øl på en bænk i et dukketeater af pap"
+                      placeholder="blur"
+                      width={1536}
+                      height={1024}
+                      sizes="(max-width: 760px) 150px, 200px"
+                    />
+                    <span className="paper-illustration" aria-hidden="true">
+                      Illustration
+                    </span>
                   </div>
-                  <p className="finder-intro">
-                    Lite sol. Något gott i glaset. Ditt nästa favoritställe i
-                    Köpenhamn.
-                  </p>
-                  <GoldenHourDiscovery />
-                  <div className="finder-section-heading">
-                    <Sun size={17} />
-                    <h2>Hitta en plats i solen</h2>
-                  </div>
-                  <div className="finder-location-label">
-                    <label htmlFor="district">Var?</label>
+                  <div className="finder-edit-row">
+                    <button
+                      className="finder-toggle"
+                      type="button"
+                      aria-expanded={finderExpanded}
+                      aria-controls="finder-fields"
+                      onClick={() => setFinderExpanded((value) => !value)}
+                    >
+                      <SlidersHorizontal size={16} />{" "}
+                      {finderExpanded ? "Luk sted og tid" : "Vælg sted og tid"}
+                      <ChevronRight size={16} />
+                    </button>
                     <button
                       type="button"
                       className={
@@ -548,93 +570,105 @@ export default function App() {
                           : "Nära mig"}
                     </button>
                   </div>
-                  <select
-                    id="district"
-                    value={district}
-                    disabled={locating}
-                    onChange={(event) => {
-                      setDistrict(event.target.value);
-                      setOrigin(null);
-                      setLocationError("");
-                    }}
-                  >
-                    <option value="">Hela Köpenhamn</option>
-                    {districts.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="finder-current-choice">
+                    {origin ? "Nær dig" : district || "København"}{" "}
+                    <span>·</span> {date === localDate() ? "I dag" : date}{" "}
+                    <span>·</span> {clock(atHour(date, hour))}
+                  </div>
                   {locationError && (
                     <p className="finder-notice" role="status">
                       {locationError}
                     </p>
                   )}
-                  <div className="finder-time-heading">
-                    <span>När?</span>
-                    <button
-                      type="button"
-                      className={`now-button ${live ? "active" : ""}`}
-                      aria-pressed={live}
-                      onClick={() => setLive(true)}
-                    >
-                      Nu
-                    </button>
-                  </div>
-                  <div className="finder-date-time">
-                    <label>
-                      <span className="sr-only">Dag</span>
-                      <select
-                        aria-label="Dag"
-                        value={date}
-                        onChange={(event) => {
-                          setDate(event.target.value);
-                          setLive(false);
-                        }}
-                      >
-                        {days.map((day) => (
-                          <option key={day.value} value={day.value}>
-                            {day.label} · {day.day}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span className="sr-only">Klockslag</span>
-                      <input
-                        type="time"
-                        aria-label="Exakt klockslag"
-                        step="60"
-                        value={clock(atHour(date, hour))}
-                        onChange={(event) => {
-                          if (!/^\d{2}:\d{2}$/.test(event.target.value)) return;
-                          const [h, m] = event.target.value
-                            .split(":")
-                            .map(Number);
-                          setHour(h + m / 60);
-                          setLive(false);
-                        }}
-                      />
-                    </label>
-                  </div>
-                  <fieldset className="finder-types">
-                    <legend>Vad har du lust till?</legend>
-                    <div>
-                      {categoryOptions.map(({ id, label, icon: Icon }) => (
-                        <button
-                          key={id}
-                          type="button"
-                          className={categories.includes(id) ? "active" : ""}
-                          data-category={id}
-                          aria-pressed={categories.includes(id)}
-                          onClick={() => toggleCategory(id)}
-                        >
-                          <Icon size={17} />
-                          {label}
-                        </button>
-                      ))}
+                  <div id="finder-fields" className="finder-fields">
+                    <div className="finder-location-label">
+                      <label htmlFor="district">Var?</label>
                     </div>
-                  </fieldset>
+                    <select
+                      id="district"
+                      value={district}
+                      disabled={locating}
+                      onChange={(event) => {
+                        setDistrict(event.target.value);
+                        setOrigin(null);
+                        setLocationError("");
+                      }}
+                    >
+                      <option value="">Hela Köpenhamn</option>
+                      {districts.map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="finder-time-heading">
+                      <span>När?</span>
+                      <button
+                        type="button"
+                        className={`now-button ${live ? "active" : ""}`}
+                        aria-pressed={live}
+                        onClick={() => setLive(true)}
+                      >
+                        Nu
+                      </button>
+                    </div>
+                    <div className="finder-date-time">
+                      <label>
+                        <span className="sr-only">Dag</span>
+                        <select
+                          aria-label="Dag"
+                          value={date}
+                          onChange={(event) => {
+                            setDate(event.target.value);
+                            setLive(false);
+                          }}
+                        >
+                          {days.map((day) => (
+                            <option key={day.value} value={day.value}>
+                              {day.label} · {day.day}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span className="sr-only">Klockslag</span>
+                        <input
+                          type="time"
+                          aria-label="Exakt klockslag"
+                          step="60"
+                          value={clock(atHour(date, hour))}
+                          onChange={(event) => {
+                            if (!/^\d{2}:\d{2}$/.test(event.target.value))
+                              return;
+                            const [h, m] = event.target.value
+                              .split(":")
+                              .map(Number);
+                            setHour(h + m / 60);
+                            setLive(false);
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <fieldset className="finder-types">
+                      <legend>Vad har du lust till?</legend>
+                      <div>
+                        {categoryOptions.map(({ id, label, icon: Icon }) => (
+                          <button
+                            key={id}
+                            type="button"
+                            className={categories.includes(id) ? "active" : ""}
+                            data-category={id}
+                            aria-pressed={categories.includes(id)}
+                            onClick={() => toggleCategory(id)}
+                          >
+                            <Icon size={17} />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+                  </div>
                   <button
                     className="primary wide finder-submit"
                     disabled={pending || locating}
@@ -643,6 +677,7 @@ export default function App() {
                     {pending ? "Hittar solen…" : "Hitta min plats i solen"}
                     <ArrowUpRight size={20} />
                   </button>
+                  <GoldenHourDiscovery compact />
                   <div className="finder-secondary">
                     <span>
                       <Sun size={12} />
@@ -706,6 +741,7 @@ export default function App() {
                       className="secondary"
                       onClick={() => {
                         setFinderOpen(true);
+                        setFinderExpanded(true);
                         setDetailOpen(false);
                       }}
                     >
@@ -740,6 +776,25 @@ export default function App() {
                 </div>
               )}
             </aside>
+            <div className="map-provenance" aria-label="Datakilder på kortet">
+              <span>
+                <i />{" "}
+                {solar.error
+                  ? "Skyggedata mangler"
+                  : solar.pending
+                    ? "Beregner skygge"
+                    : "Beregnet bygningsskygge"}
+              </span>
+              <span>
+                {weatherLoading
+                  ? "Henter prognose"
+                  : weather?.stale && forecast
+                    ? "Ældre MET-prognose"
+                    : forecast
+                      ? "Vejr: MET Norway"
+                      : "Vejrprognose mangler"}
+              </span>
+            </div>
             <MapView
               pending={solar.pending}
               categories={categories}

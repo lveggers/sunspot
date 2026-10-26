@@ -13,6 +13,35 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 const errors = [];
+const waitForIllustration = async (artwork, filename) => {
+  await expect(artwork).toBeVisible();
+  if (filename) {
+    const source = new URL(await artwork.getAttribute("src"), base);
+    const imageUrl =
+      source.pathname === "/_next/image"
+        ? source.searchParams.get("url")
+        : source.href;
+    const imagePath = new URL(imageUrl, base).pathname;
+    const stem = filename.replace(/\.png$/, "");
+    assert.match(
+      imagePath,
+      new RegExp(`/${stem}(?:\\.[A-Za-z0-9_-]+)?\\.png$`),
+    );
+  }
+  await expect
+    .poll(
+      () => artwork.evaluate((img) => img.complete && img.naturalWidth > 0),
+      { timeout: 15000 },
+    )
+    .toBe(true);
+  await artwork.evaluate((img) => img.decode());
+};
+const assertArtwork = (scope, category, filename) =>
+  waitForIllustration(
+    scope.locator(`.golden-offer-art.${category} img`),
+    filename,
+  );
+
 page.on("pageerror", (error) => errors.push(error.message));
 let serverTime = Date.parse("2026-10-27T11:00:00Z");
 const iso = () => new Date(serverTime).toISOString();
@@ -144,7 +173,7 @@ try {
     exact: true,
   });
   await expect(detail.getByText("Demo beer", { exact: true })).toBeVisible();
-  await expect(detail.locator(".golden-offer-art.beer svg")).toBeVisible();
+  await assertArtwork(detail, "beer", "tiny-sun-patch.png");
   await expect(detail.locator(".golden-demo")).toBeVisible();
   await page
     .getByRole("button", { name: "Dela erbjudandet med vänner" })
@@ -173,6 +202,7 @@ try {
     page.getByRole("timer", { name: "Tid kvar på kupongen" }),
   ).toHaveText(/^(45:00|44:\d{2})$/);
   await page.setViewportSize({ width: 390, height: 667 });
+  await waitForIllustration(page.locator(".golden-voucher img.golden-art"));
   await page.screenshot({ path: "artifacts/golden-hour-voucher-mobile.png" });
   assert.ok(
     await page.evaluate(
@@ -195,7 +225,7 @@ try {
   await page.goto(`${base}/?offer=fixture-cocktail`, {
     waitUntil: "domcontentloaded",
   });
-  await expect(page.locator(".golden-offer-art.cocktail svg")).toBeVisible();
+  await assertArtwork(page, "cocktail", "golden-hour-friends.png");
   await page.evaluate(() => {
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -253,6 +283,13 @@ try {
     .click();
   await expect(page.locator(".partner-voucher-list button")).toBeDisabled();
   await page.setViewportSize({ width: 1440, height: 1000 });
+  for (const artwork of await page
+    .locator(".partner-page img.golden-art")
+    .all()) {
+    await artwork.scrollIntoViewIfNeeded();
+    await waitForIllustration(artwork);
+  }
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.screenshot({
     path: "artifacts/golden-hour-partner.png",
     fullPage: true,

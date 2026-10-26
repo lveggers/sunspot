@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "leaflet/dist/leaflet.css";
 import "../styles.css";
+import "../identity.css";
 
 export const metadata: Metadata = {
   title: "SunSpot — Sun guides your decision",

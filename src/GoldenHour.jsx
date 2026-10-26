@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { illustrations } from "./illustrations.js";
+import { GoldenHourExample } from "./BrandTheatre.jsx";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -27,139 +30,22 @@ const publicOfferUrl = (id) =>
   `${window.location.origin}/?offer=${encodeURIComponent(id)}`;
 
 export function GoldenHourArt({ kind = "sun", className = "" }) {
+  const source =
+    kind === "cocktail" || kind === "scene"
+      ? illustrations["golden-hour-friends"]
+      : kind === "beer"
+        ? illustrations["tiny-sun-patch"]
+        : illustrations["bench-sun"];
   return (
-    <svg
+    <Image
       className={`golden-art ${className}`}
-      viewBox="0 0 200 170"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {(kind === "sun" || kind === "scene") && (
-        <g
-          className="paper-sun"
-          transform={
-            kind === "scene" ? "translate(-8 -18) scale(.82)" : "translate(0 0)"
-          }
-        >
-          <path
-            d="m100 7 13 22 24-8 3 27 26 5-10 25 19 18-22 15 4 27-27 1-10 25-22-15-23 15-8-26-27-3 6-26-21-17 21-17-8-26 27-3 9-25 22 15Z"
-            fill="#FFCB34"
-            stroke="#202744"
-            strokeWidth="3"
-          />
-          <circle
-            cx="99"
-            cy="87"
-            r="39"
-            fill="#FFE895"
-            stroke="#202744"
-            strokeWidth="3"
-          />
-          <path
-            d="M82 81v7m30-7v7m-27 15c8 9 19 9 27-1"
-            stroke="#202744"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-          <ellipse cx="76" cy="95" rx="7" ry="4" fill="#FF8E77" />
-          <ellipse cx="121" cy="95" rx="7" ry="4" fill="#FF8E77" />
-        </g>
-      )}
-      {(kind === "beer" || kind === "scene") && (
-        <g
-          className="paper-drink"
-          transform={
-            kind === "scene"
-              ? "translate(83 45) rotate(11 55 65) scale(.67)"
-              : "translate(16 0) rotate(-8 80 85)"
-          }
-        >
-          <path
-            d="m40 35 11 117 64 1 12-119Z"
-            fill="#FFD549"
-            stroke="#202744"
-            strokeWidth="4"
-          />
-          <path
-            d="M126 52h17c18 0 13 58-10 58h-14"
-            stroke="#202744"
-            strokeWidth="12"
-          />
-          <path
-            d="M126 52h17c18 0 13 58-10 58h-14"
-            stroke="#FFF5DA"
-            strokeWidth="6"
-          />
-          <path
-            d="M38 38c-10-11-1-25 12-21 4-17 23-12 27-5 15-10 29-3 31 8 17-6 27 11 17 21-17 4-23 0-30-3-16 7-32 6-57 0Z"
-            fill="#FFF8E8"
-            stroke="#202744"
-            strokeWidth="4"
-          />
-          <path
-            d="m64 63 5 61m20-62v62m18-60-5 60"
-            stroke="#E8A925"
-            strokeWidth="7"
-            strokeLinecap="round"
-          />
-          <path
-            d="m49 91-19 16-9-10m95-3 21 27 12-8m-80 39-7 13m40-12 7 12"
-            stroke="#202744"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-          <path
-            d="M76 75v5m22-5v5m-20 10c6 6 13 6 18-1"
-            stroke="#202744"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-        </g>
-      )}
-      {kind === "cocktail" && (
-        <g className="paper-drink" transform="translate(4 -3) rotate(8 95 90)">
-          <path
-            d="m35 58 124 0c-5 40-22 61-61 61S43 98 35 58Z"
-            fill="#FF8974"
-            stroke="#202744"
-            strokeWidth="4"
-          />
-          <path d="M40 66h112" stroke="#FFE4AA" strokeWidth="8" />
-          <path
-            d="M98 120v34m-29 6h58"
-            stroke="#202744"
-            strokeWidth="5"
-            strokeLinecap="round"
-          />
-          <path
-            d="m109 68 17-46 28-8"
-            stroke="#202744"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-          <circle
-            cx="49"
-            cy="52"
-            r="22"
-            fill="#D1DF76"
-            stroke="#202744"
-            strokeWidth="4"
-          />
-          <path
-            d="m49 33 0 36m-16-18h32m-27-13 23 26m0-25L37 65"
-            stroke="#7DA251"
-            strokeWidth="2"
-          />
-          <path
-            d="M79 84v5m26-5v5m-23 12c7 6 15 6 21-1m-54-9-25 14-8-11m128 0 19 11 10-9"
-            stroke="#202744"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-        </g>
-      )}
-    </svg>
+      src={source}
+      alt=""
+      placeholder="blur"
+      width={1536}
+      height={1024}
+      sizes="(max-width: 760px) 92vw, 480px"
+    />
   );
 }
 
@@ -594,6 +480,10 @@ export function GoldenHourDiscovery({ compact = false }) {
                   ))}
                 </div>
               )}
+              <details className="prototype-offer-example">
+                <summary>Se et tydeligt demoeksempel</summary>
+                <GoldenHourExample />
+              </details>
               <Link href="/partner" className="golden-text-button">
                 Har du en plats i solen? Partnerportal
                 <ArrowUpRight size={15} />
