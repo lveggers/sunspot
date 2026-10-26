@@ -41,6 +41,11 @@ const assertArtwork = (scope, category, filename) =>
     scope.locator(`.golden-offer-art.${category} img`),
     filename,
   );
+const assertCharacter = async (scope, name) => {
+  const character = scope.locator(`.cast-character[data-character="${name}"]`);
+  await expect(character).toHaveCount(1);
+  await waitForIllustration(character.locator("img"), "sunspot-complete-cast.png");
+};
 
 page.on("pageerror", (error) => errors.push(error.message));
 let serverTime = Date.parse("2026-10-27T11:00:00Z");
@@ -174,6 +179,7 @@ try {
   });
   await expect(detail.getByText("Demo beer", { exact: true })).toBeVisible();
   await assertArtwork(detail, "beer", "tiny-sun-patch.png");
+  await assertCharacter(detail.locator(".golden-offer-poster"), "football");
   await expect(detail.locator(".golden-demo")).toBeVisible();
   await page
     .getByRole("button", { name: "Dela erbjudandet med vänner" })
@@ -203,6 +209,7 @@ try {
   ).toHaveText(/^(45:00|44:\d{2})$/);
   await page.setViewportSize({ width: 390, height: 667 });
   await waitForIllustration(page.locator(".golden-voucher img.golden-art"));
+  await assertCharacter(page.locator(".golden-voucher-stage"), "football");
   await page.screenshot({ path: "artifacts/golden-hour-voucher-mobile.png" });
   assert.ok(
     await page.evaluate(
@@ -226,6 +233,7 @@ try {
     waitUntil: "domcontentloaded",
   });
   await assertArtwork(page, "cocktail", "golden-hour-friends.png");
+  await assertCharacter(page.locator(".golden-offer-poster"), "blue-coat");
   await page.evaluate(() => {
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -302,6 +310,7 @@ try {
       passed: true,
       checks: [
         "offer deep links and drink artwork",
+        "offer and mobile voucher characters decoded from the shared atlas",
         "public offer sharing",
         "immutable server-anchored countdown and reload",
         "expiry and redeemed states",

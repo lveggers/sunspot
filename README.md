@@ -38,9 +38,10 @@ excluded from Git.
 
 ## What's included
 
-- A Copenhagen paper-theatre identity: six original adult characters,
+- A Copenhagen paper-theatre identity: nine recurring adult characters
+  guide the finder, place cards, Golden Hour and invitations alongside
   five illustrated scenes, warm cream and sage surfaces, and a map-first
-  mobile sheet. The character gallery supports keyboard tabs and swipe.
+  mobile sheet. The scene gallery supports keyboard tabs and swipe.
   [Visual system and illustration rules](docs/visual-identity.md).
 - An area, day and time finder, starting at the current Copenhagen time.
   Choose a district or search within 1.5 km of your location, then find up

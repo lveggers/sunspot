@@ -205,22 +205,9 @@
   margin: 0;
 }
 .theatre-character-portrait {
-  position: relative;
-  aspect-ratio: 2 / 3;
-  overflow: hidden;
   border: 1px solid #293c3120;
   border-radius: 7px 10px 5px 8px;
   background: var(--cream, #f3edde);
-}
-.theatre-character-portrait > img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: block;
-  width: 300%;
-  height: 300%;
-  max-width: none;
-  mix-blend-mode: multiply;
 }
 .theatre-character-card figcaption {
   padding: 10px 2px 0;

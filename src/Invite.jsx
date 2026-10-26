@@ -7,12 +7,12 @@ import {
   Clock3,
   Copy,
   MapPin,
-  Sun,
   Users,
   X,
 } from "lucide-react";
 import { api, clock, dateLabel, durationLabel, saved, save } from "./lib.js";
 import { activityNames } from "./places.js";
+import Character from "./Character.jsx";
 
 export default function Invite({ id }) {
   const [g, setG] = useState(null),
@@ -102,9 +102,6 @@ export default function Invite({ id }) {
         <ArrowLeft size={17} /> Tillbaka till kartan
       </Link>
       <div className="invite-card">
-        <div className="invite-sun">
-          <Sun size={34} />
-        </div>
         {!g ? (
           <>
             <h1>{error ? "Inbjudan saknas" : "Hämtar din inbjudan…"}</h1>
@@ -112,13 +109,21 @@ export default function Invite({ id }) {
           </>
         ) : (
           <>
-            <span className="eyebrow">
-              {g.cancelled ? "TRÄFFEN ÄR INSTÄLLD" : "EN STUND TILLSAMMANS"}
-            </span>
-            <h1>{activityNames[g.activity]}.</h1>
-            <p className="invite-intro">
-              {g.host} bjuder in dig till <strong>{g.place.name}</strong>.
-            </p>
+            <div className="invite-character-heading">
+              <div>
+                <span className="eyebrow">
+                  {g.cancelled ? "TRÄFFEN ÄR INSTÄLLD" : "EN STUND TILLSAMMANS"}
+                </span>
+                <h1>{activityNames[g.activity]}.</h1>
+                <p className="invite-intro">
+                  {g.host} bjuder in dig till <strong>{g.place.name}</strong>.
+                </p>
+              </div>
+              <div className="invite-cast">
+                <Character character={g.cancelled ? "green-jacket" : "puffer"} />
+                <Character character={g.cancelled ? "turtleneck" : "blue-shirt"} />
+              </div>
+            </div>
             <div className="invite-facts">
               <p>
                 <CalendarDays size={19} />
@@ -163,25 +168,28 @@ export default function Invite({ id }) {
                   <legend>Kan du komma?</legend>
                   <div className="answer-options">
                     {[
-                      ["yes", "Jag kommer"],
-                      ["maybe", "Kanske"],
-                      ["no", "Kan inte"],
-                    ].map(([value, label]) => (
+                      ["yes", "Jag kommer", "puffer"],
+                      ["maybe", "Kanske", "green-jacket"],
+                      ["no", "Kan inte", "turtleneck"],
+                    ].map(([value, label, character]) => (
                       <label
                         className={answer === value ? "chosen" : ""}
                         key={value}
                       >
-                        <input
-                          type="radio"
-                          name="answer"
-                          value={value}
-                          checked={answer === value}
-                          onChange={() => {
-                            setAnswer(value);
-                            setSent(false);
-                          }}
-                        />
-                        {label}
+                        <Character character={character} />
+                        <span>
+                          <input
+                            type="radio"
+                            name="answer"
+                            value={value}
+                            checked={answer === value}
+                            onChange={() => {
+                              setAnswer(value);
+                              setSent(false);
+                            }}
+                          />
+                          {label}
+                        </span>
                       </label>
                     ))}
                   </div>

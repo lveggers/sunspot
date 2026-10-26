@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { illustrations } from "./illustrations.js";
+import Character, { characters } from "./Character.jsx";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -45,18 +46,6 @@ const scenes = [
     caption: "Et sted at mødes.",
     alt: "Venner samles med øl foran en københavnsk bar i gyldent lys, bygget som et lille papdukketeater.",
   },
-];
-
-const characters = [
-  "Cyklisten",
-  "Den røde puffer",
-  "Striberne",
-  "Fodboldtrøjen",
-  "Den grønne jakke",
-  "Den blå frakke",
-  "Den blå skjorte",
-  "De jordbærblonde krøller",
-  "Den sorte rullekrave",
 ];
 
 function SceneGallery({ onExploreMap }) {
@@ -178,26 +167,19 @@ function SceneGallery({ onExploreMap }) {
           <span>9 figurer · København 2026</span>
         </div>
         <div className="theatre-character-grid">
-          {characters.map((character, index) => (
+          {characters.map(({ id, name }) => (
             <figure
               className="theatre-character-card"
               role="img"
-              aria-label={character}
-              key={character}
+              aria-label={name}
+              key={id}
             >
-              <div className="theatre-character-portrait">
-                <Image
-                  src={illustrations["sunspot-complete-cast"]}
-                  alt=""
-                  placeholder="blur"
-                  sizes="(max-width: 760px) calc((100vw - 88px) * 1.5), 860px"
-                  loading="lazy"
-                  style={{
-                    transform: `translate(-${(index % 3) * (100 / 3)}%, -${Math.floor(index / 3) * (100 / 3)}%)`,
-                  }}
-                />
-              </div>
-              <figcaption>{character}</figcaption>
+              <Character
+                character={id}
+                className="theatre-character-portrait"
+                sizes="(max-width: 760px) calc((100vw - 88px) * 1.5), 860px"
+              />
+              <figcaption>{name}</figcaption>
             </figure>
           ))}
         </div>

@@ -2,6 +2,10 @@
 
 A practical map with a handmade, slightly absurd cast of Copenhagen adults. The illustrations carry the humor; the interface stays quiet and useful.
 
+The cast now lives throughout the app. The three new characters welcome visitors in the finder; the blue coat, football shirt and stripes lead the park, bar and food choices and their place cards. Other figures accompany search results, empty states, invitations and RSVP choices. Golden Hour uses the puffer as its entrance and recurring characters alongside offer and voucher artwork.
+
+`src/Character.jsx` supplies every figure from the approved atlas, including the full gallery. A shared registry keeps names and cell positions aligned. All these character images are decorative: labels, real weather and opening data, offer terms and native controls carry the information. The figures do not intercept clicks. The compact mobile finder keeps the search button visible and leaves at least 35% of the initial viewport available to the map. Expanded choices scroll within the finder.
+
 ## Design tokens
 
 | Token | Color | Use |

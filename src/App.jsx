@@ -1,6 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
-import { illustrations } from "./illustrations.js";
+import Character, { categoryCharacters } from "./Character.jsx";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -15,14 +14,11 @@ import {
   Cloud,
   CloudRain,
   CloudSun,
-  Sprout,
   Info,
   MapPin,
   Search,
   Sun,
   Users,
-  Utensils,
-  Wine,
   Wind,
   X,
 } from "lucide-react";
@@ -58,9 +54,9 @@ import {
 } from "./spotSearch.js";
 
 const categoryOptions = [
-  { id: "park", label: "Park", icon: Sprout },
-  { id: "bar", label: "Bar", icon: Wine },
-  { id: "restaurant", label: "Mat", icon: Utensils },
+  { id: "park", label: "Park", caption: "En bænk. Ingen hast." },
+  { id: "bar", label: "Bar", caption: "Én til i solen." },
+  { id: "restaurant", label: "Mat", caption: "Godt på tallerkenen." },
 ];
 
 const districts = [...new Set(places.map((place) => place.district))].sort(
@@ -85,7 +81,7 @@ function PlaceCard({ place, selected, result, onSelect }) {
       aria-pressed={selected}
     >
       <div className="place-art" data-category={place.category}>
-        <span>{place.emoji}</span>
+        <Character character={categoryCharacters[place.category]} />
         <small>
           {place.category === "park"
             ? "UTE"
@@ -171,7 +167,7 @@ function CreateForm({ place, date, hour, duration, onClose }) {
     <Modal title="Samla dina vänner" onClose={onClose}>
       <form className="create-form" onSubmit={submit}>
         <div className="plan-summary">
-          <span className="plan-emoji">{place.emoji}</span>
+          <Character character="blue-shirt" className="plan-character" />
           <div>
             <strong>{place.name}</strong>
             <p>{activityNames[activityFor(place.category)]}</p>
@@ -522,25 +518,19 @@ export default function App() {
                 <form onSubmit={findSpots}>
                   <div className="golden-hero paper-hero" lang="da">
                     <div>
-                      <span className="paper-edition">LIDT MERE UDELIV</span>
+                      <span className="paper-edition">BYEN ER BEDRE UDENFOR</span>
                       <h1>
                         En plads
                         <br />
                         <em>i solen.</em>
                       </h1>
+                      <p className="hero-invitation">Tag dit gode selskab med.</p>
                     </div>
-                    <Image
-                      className="paper-hero-scene"
-                      src={illustrations["bench-sun"]}
-                      alt="En københavner nyder en øl på en bænk i et dukketeater af pap"
-                      placeholder="blur"
-                      width={1536}
-                      height={1024}
-                      sizes="(max-width: 760px) 150px, 200px"
-                    />
-                    <span className="paper-illustration" aria-hidden="true">
-                      Illustration
-                    </span>
+                    <div className="hero-cast" aria-hidden="true">
+                      <Character character="blue-shirt" />
+                      <Character character="curls" />
+                      <Character character="turtleneck" />
+                    </div>
                   </div>
                   <div className="finder-edit-row">
                     <button
@@ -653,17 +643,19 @@ export default function App() {
                     <fieldset className="finder-types">
                       <legend>Vad har du lust till?</legend>
                       <div>
-                        {categoryOptions.map(({ id, label, icon: Icon }) => (
+                        {categoryOptions.map(({ id, label, caption }) => (
                           <button
                             key={id}
                             type="button"
                             className={categories.includes(id) ? "active" : ""}
                             data-category={id}
+                            aria-label={label}
                             aria-pressed={categories.includes(id)}
                             onClick={() => toggleCategory(id)}
                           >
-                            <Icon size={17} />
-                            {label}
+                            <Character character={categoryCharacters[id]} />
+                            <strong>{label}</strong>
+                            <small>{caption}</small>
                           </button>
                         ))}
                       </div>
@@ -712,6 +704,10 @@ export default function App() {
                 </form>
               ) : (
                 <div className="finder-summary">
+                  <Character
+                    character={filtered.length ? "cyclist" : "green-jacket"}
+                    className="summary-character"
+                  />
                   <h1>
                     {pending
                       ? "Söker solen…"
@@ -835,10 +831,13 @@ export default function App() {
                     </span>
                     <span className="demo-badge">BERÄKNAT · OSÄKERT</span>
                   </div>
-                  <h2>
-                    {selected.name}
-                    <span>{selected.emoji}</span>
-                  </h2>
+                  <div className="detail-heading">
+                    <div>
+                      <p className="detail-invitation" lang="da">Her kan I mødes.</p>
+                      <h2>{selected.name}</h2>
+                    </div>
+                    <Character character={categoryCharacters[selected.category]} />
+                  </div>
                   <div className="sun-window">
                     <div>
                       <Sun size={22} />
@@ -1188,7 +1187,7 @@ export default function App() {
               ))
             ) : (
               <div className="empty-state">
-                <Users size={30} />
+                <Character character="green-jacket" />
                 <h3>Det börjar med en plats.</h3>
                 <p>
                   Hitta ett ställe i solen och bjud in till din första träff.

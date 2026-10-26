@@ -128,6 +128,20 @@ const assertTouchTarget = async (locator, name) => {
     `${name} is at least 44×44px`,
   );
 };
+const assertSearchAccessible = async () => {
+  const submit = page.locator(".finder-submit");
+  await expect(submit).toBeInViewport({ ratio: 1 });
+  assert.ok(
+    await submit.evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      return button.contains(document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2,
+      ));
+    }),
+    "the initial search button is unobstructed before any scrolling",
+  );
+};
 const assertMapAccessible = async () => {
   const share = await page.evaluate(() => {
     const map = document.querySelector(".leaflet-container");
@@ -171,11 +185,35 @@ try {
   }
   await page.goto(base, { waitUntil: "domcontentloaded" });
   await page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
+  const heroCharacters = page.locator(".hero-cast .cast-character");
+  await expect(heroCharacters).toHaveCount(3);
+  assert.deepEqual(
+    await heroCharacters.evaluateAll((characters) =>
+      characters.map((character) => [
+        character.dataset.character,
+        Number(character.dataset.characterIndex),
+      ]),
+    ),
+    [["blue-shirt", 6], ["curls", 7], ["turtleneck", 8]],
+    "the hero shows the three distinct new characters",
+  );
+  for (const character of await heroCharacters.all()) {
+    await expect(character).toHaveAttribute("aria-hidden", "true");
+    assert.equal(
+      await character.evaluate((element) => getComputedStyle(element).pointerEvents),
+      "none",
+      "decorative characters do not intercept pointer input",
+    );
+    await waitForIllustration(character.locator("img"), "sunspot-complete-cast.png");
+  }
+  await assertSearchAccessible();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await assertSearchAccessible();
+  await page.setViewportSize({ width: 390, height: 667 });
   await expect(launcher()).toBeVisible();
   await assertTouchTarget(launcher(), "character theatre launcher");
   await assertNoOverflow();
   await assertMapAccessible();
-  await waitForIllustration(page.locator(".paper-hero-scene"), "bench-sun.png");
   await waitForIllustration(launcher().locator("img"), "sunspot-cast.png");
   await page.screenshot({ path: "artifacts/visual-identity-mobile.png" });
 
@@ -299,6 +337,7 @@ try {
       passed: true,
       checks: [
         "eight illustration assets including the complete nine-character atlas",
+        "three decorative hero characters and an unobstructed search button",
         "nine named characters in exact atlas cells, three desktop and two mobile columns",
         "five accessible scenes",
         "keyboard scene navigation",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { illustrations } from "./illustrations.js";
 import { GoldenHourExample } from "./BrandTheatre.jsx";
+import Character from "./Character.jsx";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -13,7 +14,6 @@ import {
   Share2,
   Sun,
   Ticket,
-  Wine,
 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import { api, clock, save, saved } from "./lib.js";
@@ -28,6 +28,7 @@ const money = (value) =>
   }).format(value);
 const publicOfferUrl = (id) =>
   `${window.location.origin}/?offer=${encodeURIComponent(id)}`;
+const offerCharacter = (kind) => kind === "cocktail" ? "blue-coat" : "football";
 
 export function GoldenHourArt({ kind = "sun", className = "" }) {
   const source =
@@ -140,7 +141,10 @@ function VoucherCard({ voucher, serverNow }) {
                 LOKAL DEMOKUPONG · INGET VERKLIGT ERBJUDANDE
               </p>
             )}
-            <GoldenHourArt kind={voucher.kind} />
+            <div className="golden-voucher-stage">
+              <Character character={offerCharacter(voucher.kind)} />
+              <GoldenHourArt kind={voucher.kind} />
+            </div>
             <h3>{voucher.title}</h3>
             <p>
               {voucher.placeName} · {money(voucher.priceDkk)}
@@ -274,11 +278,14 @@ function OfferDetail({ id }) {
   const place = places.find((item) => item.id === offer.placeId);
   return (
     <div className="golden-offer-detail">
-      <div className={`golden-offer-art ${offer.kind}`}>
-        <GoldenHourArt kind={offer.kind} />
-        <span className="golden-sticker">
-          {offer.kind === "beer" ? "ÖL I SOLEN" : "COCKTAIL HOUR"}
-        </span>
+      <div className="golden-offer-poster">
+        <Character character={offerCharacter(offer.kind)} />
+        <div className={`golden-offer-art ${offer.kind}`}>
+          <GoldenHourArt kind={offer.kind} />
+          <span className="golden-sticker">
+            {offer.kind === "beer" ? "ÖL I SOLEN" : "COCKTAIL HOUR"}
+          </span>
+        </div>
       </div>
       {offer.demo && (
         <p className="golden-demo">
@@ -392,9 +399,7 @@ export function GoldenHourDiscovery({ compact = false }) {
         className="golden-discovery-button"
         onClick={() => setOpen(true)}
       >
-        <span className="golden-discovery-icon">
-          <Wine size={25} />
-        </span>
+        <Character character="puffer" />
         <span>
           <strong>Golden hour, någon?</strong>
           <small>
@@ -430,13 +435,16 @@ export function GoldenHourDiscovery({ compact = false }) {
           ) : (
             <>
               <div className="golden-list-intro">
-                <GoldenHourArt />
+                <div className="golden-list-cast">
+                  <Character character="football" />
+                  <Character character="blue-coat" />
+                </div>
                 <div>
-                  <p className="golden-kicker">MER SOL. MER SKÅL.</p>
+                  <p className="golden-kicker">EN GOD UNDSKYLDNING.</p>
                   <h3>
-                    En god anledning
+                    Skal vi tage
                     <br />
-                    att gå ut.
+                    én mere?
                   </h3>
                 </div>
               </div>
@@ -466,7 +474,7 @@ export function GoldenHourDiscovery({ compact = false }) {
                       className={`golden-offer-card ${offer.kind}`}
                       onClick={() => setActiveId(offer.id)}
                     >
-                      <GoldenHourArt kind={offer.kind} />
+                      <Character character={offerCharacter(offer.kind)} />
                       <span>
                         <small>
                           {offer.placeName}
