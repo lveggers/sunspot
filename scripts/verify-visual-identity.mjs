@@ -79,12 +79,33 @@ const assertCharacterGallery = async (viewport) => {
   const cards = gallery.locator(".theatre-character-card");
   await expect(cards).toHaveCount(9);
   await expect(gallery.getByRole("img")).toHaveCount(9);
+  assert.equal(
+    await gallery.locator(".theatre-character-grid").evaluate(
+      (grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length,
+    ),
+    viewport === "mobile" ? 2 : 3,
+    `the ${viewport} gallery has the expected column count`,
+  );
   const names = [];
-  for (const card of await cards.all()) {
+  for (const [index, card] of (await cards.all()).entries()) {
     await expect(card).toHaveRole("img");
     await expect(card).toHaveAccessibleName(/\S/);
     names.push(await card.getAttribute("aria-label"));
     await waitForIllustration(card.locator("img"), "sunspot-complete-cast.png");
+    const atlas = await card.locator("img").evaluate((img, cell) => {
+      const portrait = img.parentElement;
+      const frame = portrait.getBoundingClientRect();
+      const image = img.getBoundingClientRect();
+      const style = getComputedStyle(portrait);
+      const width = frame.width - portrait.clientLeft - parseFloat(style.borderRightWidth);
+      const height = frame.height - portrait.clientTop - parseFloat(style.borderBottomWidth);
+      const close = (actual, expected) => Math.abs(actual - expected) < 1;
+      return close(image.width, width * 3) &&
+        close(image.height, height * 3) &&
+        close(image.left - frame.left - portrait.clientLeft, -(cell % 3) * width) &&
+        close(image.top - frame.top - portrait.clientTop, -Math.floor(cell / 3) * height);
+    }, index);
+    assert.ok(atlas, `character ${index + 1} shows its exact atlas cell`);
   }
   assert.equal(new Set(names).size, 9, "each character has a distinct accessible name");
   assert.ok(
@@ -138,10 +159,15 @@ try {
     const response = await context.request.get(`${base}/illustrations/${file}`);
     assert.equal(response.status(), 200, `illustration ${file} is served`);
     assert.match(response.headers()["content-type"] || "", /^image\//);
+    const image = await response.body();
     assert.ok(
-      (await response.body()).length > 1024,
+      image.length > 1024,
       `illustration ${file} has image content`,
     );
+    if (file === "sunspot-complete-cast.png") {
+      assert.equal(image.readUInt32BE(16), 1024, "the PNG atlas is 1024px wide");
+      assert.equal(image.readUInt32BE(20), 1536, "the PNG atlas is 1536px high");
+    }
   }
   await page.goto(base, { waitUntil: "domcontentloaded" });
   await page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
@@ -273,7 +299,7 @@ try {
       passed: true,
       checks: [
         "eight illustration assets including the complete nine-character atlas",
-        "nine individually named characters decoded without overflow on desktop and mobile",
+        "nine named characters in exact atlas cells, three desktop and two mobile columns",
         "five accessible scenes",
         "keyboard scene navigation",
         "clearly simulated notification and ticket",
