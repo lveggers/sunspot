@@ -47,6 +47,18 @@ const scenes = [
   },
 ];
 
+const characters = [
+  "Cyklisten",
+  "Den røde puffer",
+  "Striberne",
+  "Fodboldtrøjen",
+  "Den grønne jakke",
+  "Den blå frakke",
+  "Den blå skjorte",
+  "De jordbærblonde krøller",
+  "Den sorte rullekrave",
+];
+
 function SceneGallery({ onExploreMap }) {
   const [active, setActive] = useState(0);
   const tabs = useRef([]);
@@ -157,33 +169,38 @@ function SceneGallery({ onExploreMap }) {
           <ArrowRight size={19} />
         </button>
       </div>
-      <section className="theatre-cast" aria-label="SunSpot-figurerne">
+      <section
+        className="theatre-cast"
+        aria-label="SunSpots komplette karaktergalleri"
+      >
         <div className="theatre-cast-heading">
-          <h3>Byens soljægere.</h3>
-          <span>Originale figurer · København 2026</span>
+          <h3>Hele holdet.</h3>
+          <span>9 figurer · København 2026</span>
         </div>
-        <Image
-          src={illustrations["sunspot-cast"]}
-          alt="SunSpots originale voksne papfigurer med skæve proportioner, udtryksfulde ansigter, tekniske jakker, brede jeans og cykelvenlige sko."
-          placeholder="blur"
-          width={1536}
-          height={1024}
-          sizes="(max-width: 760px) calc(100vw - 52px), 880px"
-          loading="lazy"
-        />
-      </section>
-      <section className="theatre-cast" aria-label="Tre nye SunSpot-figurer">
-        <div className="theatre-cast-heading">
-          <h3>Tre mere i solen.</h3>
-          <span>Venner af SunSpot</span>
+        <div className="theatre-character-grid">
+          {characters.map((character, index) => (
+            <figure
+              className="theatre-character-card"
+              role="img"
+              aria-label={character}
+              key={character}
+            >
+              <div className="theatre-character-portrait">
+                <Image
+                  src={illustrations["sunspot-complete-cast"]}
+                  alt=""
+                  placeholder="blur"
+                  sizes="(max-width: 760px) calc((100vw - 88px) * 1.5), 860px"
+                  loading="lazy"
+                  style={{
+                    transform: `translate(-${(index % 3) * (100 / 3)}%, -${Math.floor(index / 3) * (100 / 3)}%)`,
+                  }}
+                />
+              </div>
+              <figcaption>{character}</figcaption>
+            </figure>
+          ))}
         </div>
-        <Image
-          src={illustrations["sunspot-friends-trio"]}
-          alt="Tre skæve papkarikaturer: en smilende mand i blå skjorte, en kvinde med jordbærblonde krøller og hvid T-shirt og en mørkhåret mand i sort rullekrave."
-          placeholder="blur"
-          sizes="(max-width: 760px) calc(100vw - 52px), 880px"
-          loading="lazy"
-        />
       </section>
       <GoldenHourExample />
       {onExploreMap && (

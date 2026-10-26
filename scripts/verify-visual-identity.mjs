@@ -69,6 +69,36 @@ const assertNoOverflow = async () => {
     "the prototype does not create horizontal viewport overflow",
   );
 };
+const assertCharacterGallery = async (viewport) => {
+  const gallery = theatre().getByRole("region", {
+    name: "SunSpots komplette karaktergalleri",
+    exact: true,
+  });
+  await gallery.scrollIntoViewIfNeeded();
+  await expect(gallery).toBeVisible();
+  const cards = gallery.locator(".theatre-character-card");
+  await expect(cards).toHaveCount(9);
+  await expect(gallery.getByRole("img")).toHaveCount(9);
+  const names = [];
+  for (const card of await cards.all()) {
+    await expect(card).toHaveRole("img");
+    await expect(card).toHaveAccessibleName(/\S/);
+    names.push(await card.getAttribute("aria-label"));
+    await waitForIllustration(card.locator("img"), "sunspot-complete-cast.png");
+  }
+  assert.equal(new Set(names).size, 9, "each character has a distinct accessible name");
+  assert.ok(
+    await gallery.evaluate((region) => {
+      const grid = region.querySelector(".theatre-character-grid");
+      return grid && grid.scrollWidth <= grid.clientWidth;
+    }),
+    `all nine character cards fit the ${viewport} gallery width`,
+  );
+  await assertNoOverflow();
+  await gallery.screenshot({
+    path: `artifacts/visual-identity-character-gallery-${viewport}.png`,
+  });
+};
 const assertTouchTarget = async (locator, name) => {
   await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
@@ -103,6 +133,7 @@ try {
     ...scenes.map(([, filename]) => filename),
     "sunspot-cast.png",
     "sunspot-friends-trio.png",
+    "sunspot-complete-cast.png",
   ]) {
     const response = await context.request.get(`${base}/illustrations/${file}`);
     assert.equal(response.status(), 200, `illustration ${file} is served`);
@@ -232,21 +263,17 @@ try {
   await page.screenshot({
     path: "artifacts/visual-identity-theatre-desktop.png",
   });
-  const newCast = theatre().getByRole("region", {
-    name: "Tre nye SunSpot-figurer",
-  });
-  await newCast.scrollIntoViewIfNeeded();
-  await expect(newCast).toBeVisible();
-  await waitForIllustration(newCast.locator("img"), "sunspot-friends-trio.png");
-  await assertNoOverflow();
-  await page.screenshot({ path: "artifacts/visual-identity-new-characters.png" });
+  await assertCharacterGallery("desktop");
+  await page.setViewportSize({ width: 390, height: 667 });
+  await assertCharacterGallery("mobile");
   await page.keyboard.press("Escape");
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
       passed: true,
       checks: [
-        "seven illustration assets including three new characters",
+        "eight illustration assets including the complete nine-character atlas",
+        "nine individually named characters decoded without overflow on desktop and mobile",
         "five accessible scenes",
         "keyboard scene navigation",
         "clearly simulated notification and ticket",
