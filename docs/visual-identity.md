@@ -19,7 +19,7 @@ Fraunces is the editorial display face, with DM Sans for controls and data. Pape
 
 ## Cast and scenery
 
-Six original adult puppets use contrasting lanky and squat proportions, half-lidded eyes, expressive noses, imperfect teeth, visible suspension strings and brass paper joints. Practical jackets, wide denim, football shirts, scarves, cycling details and everyday bags place them in contemporary Copenhagen.
+Six original adult puppets use contrasting lanky and squat proportions, half-lidded eyes, expressive noses, imperfect teeth, visible suspension strings and uninterrupted paper clothing. No visible joint rivets, brads or decorative fasteners are used. Pupils share a coherent gaze while the heavy eyelids retain the dry expression. Practical jackets, wide denim, football shirts, scarves, cycling details and everyday bags place them in contemporary Copenhagen.
 
 The supplied cartoon references informed proportion and expression; their actual characters were not copied. Wardrobe research includes original photography from [Copenhagen in August 2026](https://www.vogue.com/slideshow/copenhagen-fashion-week-street-style-spring-2027) and [AW26 street style](https://www.voguescandinavia.com/articles/the-best-street-style-copenhagen-fashion-week-fall-winter-2026).
 
