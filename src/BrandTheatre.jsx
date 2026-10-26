@@ -172,6 +172,19 @@ function SceneGallery({ onExploreMap }) {
           loading="lazy"
         />
       </section>
+      <section className="theatre-cast" aria-label="Tre nye SunSpot-figurer">
+        <div className="theatre-cast-heading">
+          <h3>Tre mere i solen.</h3>
+          <span>Venner af SunSpot</span>
+        </div>
+        <Image
+          src={illustrations["sunspot-friends-trio"]}
+          alt="Tre skæve papkarikaturer: en smilende mand i blå skjorte, en kvinde med jordbærblonde krøller og hvid T-shirt og en mørkhåret mand i sort rullekrave."
+          placeholder="blur"
+          sizes="(max-width: 760px) calc(100vw - 52px), 880px"
+          loading="lazy"
+        />
+      </section>
       <GoldenHourExample />
       {onExploreMap && (
         <button

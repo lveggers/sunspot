@@ -102,6 +102,7 @@ try {
   for (const file of [
     ...scenes.map(([, filename]) => filename),
     "sunspot-cast.png",
+    "sunspot-friends-trio.png",
   ]) {
     const response = await context.request.get(`${base}/illustrations/${file}`);
     assert.equal(response.status(), 200, `illustration ${file} is served`);
@@ -231,13 +232,21 @@ try {
   await page.screenshot({
     path: "artifacts/visual-identity-theatre-desktop.png",
   });
+  const newCast = theatre().getByRole("region", {
+    name: "Tre nye SunSpot-figurer",
+  });
+  await newCast.scrollIntoViewIfNeeded();
+  await expect(newCast).toBeVisible();
+  await waitForIllustration(newCast.locator("img"), "sunspot-friends-trio.png");
+  await assertNoOverflow();
+  await page.screenshot({ path: "artifacts/visual-identity-new-characters.png" });
   await page.keyboard.press("Escape");
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
       passed: true,
       checks: [
-        "six original illustration assets",
+        "seven illustration assets including three new characters",
         "five accessible scenes",
         "keyboard scene navigation",
         "clearly simulated notification and ticket",

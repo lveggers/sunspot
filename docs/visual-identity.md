@@ -31,7 +31,9 @@ The five scenes are:
 4. Friends chasing the sun between Copenhagen buildings.
 5. A gathering outside a bar during Golden Hour.
 
-All six original PNG assets are in `public/illustrations`. Static imports give them content-hashed URLs and native blur previews. They are served through Next.js image optimization at responsive sizes; scenes load individually when opened. Full-size source artwork is not downloaded as an initial six-image bundle.
+The original six-person cast is joined by three portrait-inspired caricatures in `sunspot-friends-trio.png`: a smiling man in a blue striped shirt, a strawberry-blonde curly-haired woman in a white T-shirt and a dark-haired man in a black turtleneck. Their uneven smiles, pronounced noses and imperfect faces keep them humorous rather than polished. All characters retain heavy eyelids with medium, clearly visible pupils, between large irises and tiny dots.
+
+All seven PNG assets are in `public/illustrations`. Static imports give them content-hashed URLs and native blur previews. They are served through Next.js image optimization at responsive sizes; scenes load individually when opened. Full-size source artwork is not downloaded as an initial bundle.
 
 ## Interaction and data honesty
 
