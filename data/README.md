@@ -36,9 +36,3 @@ Utdraget ger 139 parkytor och 412 vattenpolygoner efter konvertering. Sex namngi
 `npm run data:parks` hämtar ett nytt utdrag och kör det lokala bygget. `npm run data:venues` återskapar platsdata utan nätanrop. OSM-ID används som stabil identitet; ursprungliga plats-ID:n behålls för befintliga inbjudningar. Importen bevarar multipolygoners separata delar och hål, utesluter vatten från beräkningspunkter och avbryter vid ett ofullständigt API-svar. Parker kan sträcka sig utanför byggnadsmodellen och ska då visa okänt solläge.
 
 [Overpass områdesfrågor](https://wiki.openstreetmap.org/wiki/Overpass_API/Areas) beskriver kommunavgränsningen. Fælledparkens kommunala informationssida finns hos [Københavns Kommune](https://www.kk.dk/brug-byen/natur-og-groenne-omraader/parker/faelledparken).
-
-## Adresser för event
-
-`event-locations.json` innehåller 22 entydigt matchade adresspunkter från [Dataforsyningens adress-API](https://api.dataforsyningen.dk/adresser). Varje post har sin exakta frågelänk och filen anger kontrolltid. Adresserna kommer från Københavns Bibliotekers öppna eventflöde. Inga deltagaruppgifter ingår.
-
-Återskapa med `npm run data:event-locations`. Importen använder gata, husnummer och postnummer; endast en unik, aktiv adresspunkt inom Köpenhamnsområdet godtas. Nya eller oklara adresser visas inte på kartan förrän underlaget har uppdaterats. Själva eventen hämtas vid körning och sparas inte i denna fil. Se [eventkällor](../docs/15-eventkallor.md).

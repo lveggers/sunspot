@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createApi } from "./api.js";
 import { weatherService } from "./weather.js";
+import { createSunEligibility } from "./sun-eligibility.js";
 
 const key = Symbol.for("sunspot.api");
 const weatherKey = Symbol.for("sunspot.weather");
@@ -33,7 +34,7 @@ export function handleApi(request) {
     return Response.json(
       {
         error:
-          "Inbjudningar behöver beständig databas innan de kan användas i denna miljö.",
+          "Träffar och Golden Hour behöver en beständig databas innan de kan användas i denna miljö.",
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
@@ -43,10 +44,18 @@ export function handleApi(request) {
       /* turbopackIgnore: true */ process.env.SUNSPOT_DATA_DIR || ".data",
     );
     mkdirSync(directory, { recursive: true });
+    // Next dev normalizes Request.url to its bind host (0.0.0.0 in Docker).
+    const port = new URL(request.url).port;
+    const localOrigins =
+      process.env.NODE_ENV === "development"
+        ? [`http://localhost:${port}`, `http://127.0.0.1:${port}`]
+        : undefined;
     globalThis[key] = createApi({
       database: resolve(directory, "sunspot.sqlite"),
       getWeather,
-      origin: process.env.SUNSPOT_PUBLIC_ORIGIN,
+      getSunEligibility: createSunEligibility(getWeather),
+      development: process.env.NODE_ENV === "development",
+      origin: process.env.SUNSPOT_PUBLIC_ORIGIN || localOrigins,
     });
   }
   return globalThis[key].handle(request);

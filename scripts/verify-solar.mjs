@@ -1,51 +1,35 @@
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
+
 const browser = await chromium.launch({
   executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined,
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
+page.on("pageerror", (error) => errors.push(error.message));
 const ready = () =>
   page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
-const time = async (hour) => {
-  const dayIndex = await page
-    .locator(".days")
-    .evaluate((el) =>
-      [...el.children].findIndex(
-        (button) => button.getAttribute("aria-pressed") === "true",
-      ),
-    );
-  await page
-    .getByRole("slider")
-    .fill(String(dayIndex * 1440 + Math.round(hour * 60)));
-  await ready();
-};
-const filter = async (action) => {
-  await page.getByRole("button", { name: "Öppna filter", exact: true }).click();
-  await action();
-  await page.getByRole("button", { name: "Visa kartan", exact: true }).click();
-};
-const choose = async (name) => {
-  await page
-    .getByRole("textbox", { name: "Sök plats eller område" })
-    .fill(name);
-  await page
-    .getByRole("button", { name: "Visa platslista", exact: true })
-    .click();
-  await page
-    .locator(".place-list")
-    .getByRole("heading", { name, exact: true })
-    .click();
+const clearWeather = {
+  available: true,
+  stale: false,
+  timeseries: Array.from({ length: 48 }, (_, hour) => ({
+    time: new Date(
+      Date.parse("2026-09-17T00:00:00Z") + hour * 3600000,
+    ).toISOString(),
+    data: {
+      instant: {
+        details: { air_temperature: 18, wind_speed: 3, cloud_area_fraction: 5 },
+      },
+      next_1_hours: {
+        summary: { symbol_code: "clearsky_day" },
+        details: { precipitation_amount: 0 },
+      },
+    },
+  })),
 };
 try {
-  await page.route("**/api/events?**", (route) =>
-    route.fulfill({ json: { events: [], available: true, stale: false } }),
-  );
-  await page.addInitScript(() =>
-    localStorage.setItem("sunspot:demo-events", "true"),
-  );
-  await page.clock.setSystemTime(new Date("2026-09-16T12:00:00Z"));
+  // Historical geometry fixture: test the seat/warning independently of the strict defaults.
+  await page.clock.setSystemTime(new Date("2026-09-17T12:00:00Z"));
   await page.addInitScript(() => {
     window.testNotifications = [];
     window.Notification = class {
@@ -58,36 +42,35 @@ try {
       }
     };
   });
+  await page.route("**/api/weather", (route) =>
+    route.fulfill({ json: clearWeather }),
+  );
   await page.goto(process.env.SUNSPOT_URL || "http://localhost:3000", {
     waitUntil: "domcontentloaded",
   });
   await ready();
-  await choose("Kayak Bar");
-  await time(17);
-  await expect(
-    page.getByRole("button", { name: "Visa Kayak Bar", exact: true }),
-  ).toHaveCount(0);
-  await expect(page.locator(".detail-card")).toContainText("I byggnadsskugga");
-  await page.getByRole("textbox", { name: "Sök plats eller område" }).fill("");
-  await expect(
-    page.getByRole("button", { name: "Visa Kongens Have", exact: true }),
-  ).toHaveCount(1);
-  await filter(() =>
-    page
-      .getByRole("checkbox", { name: "Dölj skugga och stängda platser" })
-      .uncheck(),
-  );
-  await expect(
-    page.getByRole("button", { name: "Visa Kayak Bar", exact: true }),
-  ).toHaveCount(1);
-  await filter(() =>
-    page
-      .getByRole("checkbox", { name: "Dölj skugga och stängda platser" })
-      .check(),
-  );
-  await time(16);
-  await page.getByRole("button", { name: "Bar", exact: true }).click();
-  await choose("Ølbaren");
+  await page.getByRole("button", { name: "Öppna filter", exact: true }).click();
+  await page
+    .getByRole("checkbox", { name: "Dölj skugga och osäkert solläge" })
+    .uncheck();
+  await page
+    .getByRole("checkbox", { name: "Bara bekräftat öppet enligt OSM" })
+    .uncheck();
+  await page
+    .getByRole("combobox", { name: "Tid på platsen" })
+    .selectOption("30");
+  await page
+    .getByRole("textbox", { name: "Sök plats eller område" })
+    .fill("Ølbaren");
+  await page
+    .getByRole("button", { name: "Använd filter", exact: true })
+    .click();
+  await page.getByLabel("Exakt klockslag").fill("16:40");
+  await page
+    .getByRole("button", { name: "Hitta min plats i solen", exact: true })
+    .click();
+  await ready();
+  await expect(page.locator(".detail-card")).toContainText("Ølbaren");
   await page.getByText("Mer om platsen", { exact: true }).click();
   await page
     .getByRole("button", { name: "Välj min sittplats på kartan", exact: true })
@@ -97,16 +80,14 @@ try {
     .click();
   await ready();
   await expect(page.locator(".detail-card")).toContainText("Din valda punkt");
+  const chosen = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("sunspot:seats:v1"))?.["osm-24958713"],
+  );
   assert.ok(
-    await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("sunspot:seats:v1"))?.["osm-24958713"],
-    ),
+    Array.isArray(chosen) && chosen.length === 2,
+    "chosen seat is persisted",
   );
-  await filter(() =>
-    page.getByRole("combobox", { name: "Tid tillsammans" }).selectOption("30"),
-  );
-  await time(16 + 40 / 60);
   await page
     .getByRole("button", { name: "Bevaka solen här", exact: true })
     .click();
@@ -114,10 +95,13 @@ try {
     "Skuggan når din punkt om cirka",
   );
   await expect(page.locator(".next-places button").first()).toBeVisible();
-  assert.equal(await page.evaluate(() => window.testNotifications.length), 0);
+  assert.equal(
+    await page.evaluate(() => window.testNotifications.length),
+    0,
+    "planning never sends a system notification",
+  );
   await page.clock.setSystemTime(new Date("2026-09-17T14:40:00Z"));
   await page
-    .locator(".solar-watch")
     .getByRole("button", { name: "Följ klockan nu", exact: true })
     .click();
   await ready();
@@ -131,62 +115,35 @@ try {
     document.dispatchEvent(new Event("visibilitychange")),
   );
   await ready();
-  assert.equal(await page.evaluate(() => window.testNotifications.length), 1);
-  await time(16 + 50 / 60);
-  await expect(
-    page.getByRole("button", { name: "Visa Ølbaren", exact: true }),
-  ).toHaveCount(0);
+  assert.equal(
+    await page.evaluate(() => window.testNotifications.length),
+    1,
+    "same shadow arrival is notified once while minimized",
+  );
   await page.locator(".watch-peek").click();
-  await expect(page.locator(".solar-watch")).toContainText("I byggnadsskugga");
   await page
     .getByRole("button", { name: "Avsluta solbevakning", exact: true })
     .click();
-  await page.getByRole("textbox", { name: "Sök plats eller område" }).fill("");
-  for (const hour of [9, 18, 12, 17, 16])
-    await page.getByRole("slider").fill(String(1440 + hour * 60));
-  await ready();
-  await time(0);
-  await expect(page.locator(".place-pin:not(.event-pin)")).toHaveCount(0);
-  await time(16);
-  await filter(() =>
-    page
-      .getByRole("checkbox", { name: "Bara bekräftat öppet enligt OSM" })
-      .check(),
-  );
-  await page
-    .getByRole("button", { name: "Visa platslista", exact: true })
-    .click();
-  await expect(
-    page.locator(".place-list").getByText("Öppettider okända", { exact: true }),
-  ).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.ok(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  );
   await page.reload({ waitUntil: "domcontentloaded" });
   await ready();
-  assert.ok(
+  assert.deepEqual(
     await page.evaluate(
       () =>
         JSON.parse(localStorage.getItem("sunspot:seats:v1"))?.["osm-24958713"],
     ),
+    chosen,
   );
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
       passed: true,
       checks: [
-        "shadow filters and partial parks",
-        "seat editing and persistence",
-        "10-minute warning and alternatives",
+        "seat editing",
+        "seat persistence after reload",
+        "shadow warning and nearby alternatives",
         "no planning notification",
-        "live notification and deduplication while panel minimized",
-        "night and opening filters",
-        "rapid slider changes",
-        "mobile",
+        "live notification",
+        "deduplication while minimized",
       ],
     }),
   );

@@ -7,16 +7,16 @@ import { atHour } from "./lib.js";
 
 import * as SunCalc from "suncalc";
 import BuildingShadowLayer from "./BuildingShadowLayer.js";
-import { parkFocusLayer, fitParkView } from "./ParkFocusLayer.js";
+import { hasParkArea, parkFocusLayer, fitParkView } from "./ParkFocusLayer.js";
 import { venueFocusLayer, fitPlacesView } from "./VenueFocusLayer.js";
-import { places as allPlaces } from "./places.js";
 
 export default function MapView({
   pending = false,
-  category = "all",
+  categories = ["park", "bar", "restaurant"],
+  focusResults = false,
+  fitResultsToken = 0,
   viewReset = 0,
   places,
-  events = [],
   selected,
   onSelect,
   date,
@@ -32,8 +32,12 @@ export default function MapView({
   seatError,
   children,
 }) {
-  const touchgrass = category === "park";
-  const venueFocus = category === "bar" || category === "restaurant";
+  const touchgrass =
+    focusResults &&
+    categories.length === 1 &&
+    categories[0] === "park" &&
+    places.every(hasParkArea);
+  const venueFocus = focusResults && !touchgrass;
   const container = useRef(null),
     map = useRef(null),
     layer = useRef(null);
@@ -41,6 +45,7 @@ export default function MapView({
   const seatLayer = useRef(null);
   const markers = useRef(new Map());
   const lastPlaces = useRef([]);
+  const fittedRequest = useRef({ fitResultsToken, viewReset });
   const [toolsOpen, setToolsOpen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
   const [zones, setZones] = useState(true),
@@ -84,13 +89,10 @@ export default function MapView({
       const items = editing
         ? []
         : groupMapMarkers(
-            [
-              ...(pending ? lastPlaces.current : places).map((p) => {
-                const point = results[p.id]?.point;
-                return point ? { ...p, lat: point[1], lng: point[0] } : p;
-              }),
-              ...events,
-            ],
+            (pending ? lastPlaces.current : places).map((p) => {
+              const point = results[p.id]?.point;
+              return point ? { ...p, lat: point[1], lng: point[0] } : p;
+            }),
             {
               project: (p) => m.project([p.lat, p.lng], zoom),
               zoom,
@@ -149,7 +151,7 @@ export default function MapView({
         record.item = p;
         const signature = `${p.name}|${p.emoji}|${active}|${compact}|${results[p.id]?.state}|${p.members?.length}`;
         if (signature !== record.signature) {
-          record.button.className = `place-pin ${p.members ? "cluster-pin" : ""} ${p.category === "event" ? "event-pin" : ""} ${active ? "active" : ""} ${results[p.id]?.state === "sun" ? "sunny" : ""} ${compact && !p.members ? "compact" : ""}`;
+          record.button.className = `place-pin ${p.members ? "cluster-pin" : ""} ${active ? "active" : ""} ${results[p.id]?.state === "sun" ? "sunny" : ""} ${compact && !p.members ? "compact" : ""}`;
           record.button.setAttribute(
             "aria-label",
             p.members ? `Zooma in: ${p.name}` : `Visa ${p.name}`,
@@ -160,12 +162,10 @@ export default function MapView({
           record.button.dataset.id = p.id;
           record.emoji.textContent = p.emoji;
           record.name.textContent = p.members ? p.members.length : p.name;
-          record.marker.setZIndexOffset(
-            active ? 1000 : p.category === "event" ? 800 : 0,
-          );
+          record.marker.setZIndexOffset(active ? 1000 : 0);
           record.signature = signature;
         }
-        record.button.hidden = pending && p.category !== "event";
+        record.button.hidden = pending;
         const current = record.marker.getLatLng();
         if (current.lat !== p.lat || current.lng !== p.lng)
           record.marker.setLatLng([p.lat, p.lng]);
@@ -174,10 +174,10 @@ export default function MapView({
     update();
     m.on("moveend zoomend resize", update);
     return () => m.off("moveend zoomend resize", update);
-  }, [places, events, selected, results, onSelect, editing, pending]);
+  }, [places, selected, results, onSelect, editing, pending]);
   useEffect(() => {
     if (selected?.greenSpace && touchgrass && map.current) {
-      fitParkView(map.current, selected.id);
+      fitParkView(map.current, places, selected.id);
       return;
     }
     if (
@@ -186,6 +186,8 @@ export default function MapView({
       !map.current.getBounds().pad(-0.1).contains([selected.lat, selected.lng])
     )
       map.current.panTo([selected.lat, selected.lng]);
+    // Selecting a place changes the view; updated result batches do not.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, touchgrass]);
   useEffect(() => {
     if (!map.current) return;
@@ -232,26 +234,15 @@ export default function MapView({
     shadowLayer.current?.setInstant(atHour(date, hour));
   }, [date, hour]);
   useEffect(() => {
-    if (!touchgrass || !map.current) return;
-    const focus = parkFocusLayer(map.current, selected?.id, onSelect).addTo(
+    if (!touchgrass || editing || !map.current) return;
+    const focus = parkFocusLayer(
       map.current,
-    );
+      places,
+      selected?.id,
+      onSelect,
+    ).addTo(map.current);
     return () => focus.remove();
-  }, [touchgrass, selected?.id, onSelect]);
-  useEffect(() => {
-    if (!touchgrass || !map.current) return;
-    const m = map.current;
-    const fit = () => fitParkView(m);
-    const frame = requestAnimationFrame(() => {
-      m.invalidateSize();
-      fit();
-    });
-    m.on("resize", fit);
-    return () => {
-      cancelAnimationFrame(frame);
-      m.off("resize", fit);
-    };
-  }, [touchgrass]);
+  }, [touchgrass, editing, places, selected?.id, onSelect]);
   useEffect(() => {
     if (!venueFocus || editing || !map.current) return;
     const focus = venueFocusLayer(map.current, places, results).addTo(
@@ -260,26 +251,17 @@ export default function MapView({
     return () => focus.remove();
   }, [venueFocus, editing, places, results]);
   useEffect(() => {
-    if (!venueFocus || !map.current) return;
-    const m = map.current;
-    const fit = () =>
-      fitPlacesView(
-        m,
-        allPlaces.filter((p) => p.category === category),
-      );
-    const frame = requestAnimationFrame(() => {
-      m.invalidateSize();
-      fit();
-    });
-    m.on("resize", fit);
-    return () => {
-      cancelAnimationFrame(frame);
-      m.off("resize", fit);
-    };
-  }, [category, venueFocus]);
-  useEffect(() => {
-    if (viewReset && map.current) fitPlacesView(map.current, allPlaces);
-  }, [viewReset]);
+    if (!map.current || pending) return;
+    const previous = fittedRequest.current;
+    if (
+      previous.fitResultsToken === fitResultsToken &&
+      previous.viewReset === viewReset
+    )
+      return;
+    fittedRequest.current = { fitResultsToken, viewReset };
+    if (touchgrass) fitParkView(map.current, places);
+    else fitPlacesView(map.current, places);
+  }, [fitResultsToken, viewReset, pending, places, touchgrass]);
   const altitude = SunCalc.getPosition(
     atHour(date, hour),
     55.6865,
@@ -287,8 +269,8 @@ export default function MapView({
   ).altitude;
   return (
     <section
-      className={`map-shell ${editing ? "editing" : ""} ${touchgrass ? "touchgrass" : ""} ${venueFocus ? `venue-focus ${category}` : ""}`}
-      data-category={category}
+      className={`map-shell ${editing ? "editing" : ""} ${touchgrass ? "touchgrass" : ""} ${venueFocus ? "venue-focus" : ""}`}
+      data-categories={categories.join(" ")}
       aria-label="Karta över platser i Köpenhamn"
     >
       <div ref={container} className="map" />
@@ -311,14 +293,8 @@ export default function MapView({
           <button
             onClick={() =>
               touchgrass
-                ? map.current && fitParkView(map.current)
-                : map.current &&
-                  fitPlacesView(
-                    map.current,
-                    allPlaces.filter(
-                      (p) => category === "all" || p.category === category,
-                    ),
-                  )
+                ? map.current && fitParkView(map.current, places)
+                : map.current && fitPlacesView(map.current, places)
             }
             aria-label="Visa hela området"
           >

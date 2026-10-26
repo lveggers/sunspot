@@ -65,14 +65,43 @@ export function weatherAt(weather, date) {
   const hours = Number(key.split("_")[1]);
   if (target >= Date.parse(row.time) + hours * 3600_000) return null;
   return {
-    temperature: row.data.instant.details.air_temperature,
-    wind: row.data.instant.details.wind_speed,
-    symbol: row.data[key].summary.symbol_code,
-    rain: row.data[key].details.precipitation_amount,
+    temperature: row.data.instant?.details?.air_temperature,
+    wind: row.data.instant?.details?.wind_speed,
+    cloud: row.data.instant?.details?.cloud_area_fraction,
+    symbol: row.data[key].summary?.symbol_code,
+    rain: row.data[key].details?.precipitation_amount,
     hours,
     time: row.time,
   };
 }
+
+export function sunshineWeather(weather, instant) {
+  const forecast = weatherAt(weather, instant);
+  if (!forecast || weather.stale)
+    return { state: "unknown", label: "Aktuell väderprognos saknas" };
+  const symbol = forecast.symbol || "";
+  if (/rain|snow|sleet|thunder/.test(symbol) || forecast.rain > 0)
+    return { state: "rain", label: "Nederbörd i prognosen" };
+  // Conservative cloud cutoff; use direct-sun probability if MET supplies it.
+  if (symbol === "cloudy" || symbol === "fog" || forecast.cloud >= 80)
+    return { state: "cloud", label: "Moln eller dimma i prognosen" };
+  if (/^(clearsky|fair|partlycloudy)_day$/.test(symbol))
+    return { state: "sun", label: "Möjlig sol enligt prognosen" };
+  return { state: "unknown", label: "Sol kan inte bekräftas av prognosen" };
+}
+
+export function applySunshineWeather(results, condition) {
+  if (condition.state === "sun") return results;
+  const state =
+    condition.state === "unknown" ? "weather-unknown" : condition.state;
+  return Object.fromEntries(
+    Object.entries(results).map(([id, result]) => [
+      id,
+      result.state === "sun" ? { ...result, state } : result,
+    ]),
+  );
+}
+
 export function weatherText(symbol = "") {
   if (symbol.includes("thunder")) return "Åskrisk";
   if (symbol.includes("rain")) return "Regn i prognosen";

@@ -24,17 +24,15 @@ test("city-scale groups retain every park and release individual places on zoom"
   assert.deepEqual(unpack(grouped), items.map((p) => p.id).sort());
   assert.equal(groupMapMarkers(items, { ...options, zoom: 17 }).length, 120);
 });
-test("selected places and individual events remain accessible; offscreen places are culled", () => {
-  const event = { ...items[0], id: "event", category: "event" };
+test("selected places remain accessible; offscreen places are culled", () => {
   const outside = { ...items[0], id: "outside", lat: 56 };
-  const result = groupMapMarkers([...items, event, outside], {
+  const result = groupMapMarkers([...items, outside], {
     ...options,
     selectedId: "park-0",
   });
   assert.ok(result.some((m) => m.markerId === "park-0" && !m.members));
-  assert.ok(result.some((m) => m.markerId === "event" && !m.members));
   assert.ok(!unpack(result).includes("outside"));
-  assert.equal(new Set(unpack(result)).size, 121);
+  assert.equal(new Set(unpack(result)).size, 120);
 });
 test("group identities are stable when input order changes", () => {
   assert.deepEqual(

@@ -1,0 +1,52 @@
+name: sunspot-development
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    init: true
+    command:
+      [
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "--hostname",
+        "0.0.0.0",
+        "--port",
+        "${SUNSPOT_PORT:-3085}",
+      ]
+    ports:
+      - "127.0.0.1:${SUNSPOT_PORT:-3085}:${SUNSPOT_PORT:-3085}"
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      NODE_ENV: development
+      VERCEL: ""
+      SUNSPOT_DATA_DIR: /app/.data
+      SUNSPOT_PUBLIC_ORIGIN: ""
+    volumes:
+      - .:/app
+      - dependencies:/app/node_modules
+      - data:/app/.data
+    tmpfs:
+      - /app/.next:size=1g
+    cpus: 2
+    mem_limit: 2g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+volumes:
+  dependencies:
+  data:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: "${SUNSPOT_SUBNET:-10.251.248.0/28}"

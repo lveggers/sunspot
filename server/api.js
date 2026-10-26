@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomBytes } from "node:crypto";
 import { places } from "../src/places.js";
+import { createGoldenHourApi } from "./golden-hour.js";
 
 const token = () => randomBytes(24).toString("base64url");
 const hash = (value) =>
@@ -66,6 +67,12 @@ async function readBody(request) {
 export function createApi({
   database = ":memory:",
   getWeather = async () => ({ available: false }),
+  getSunEligibility = async () => ({
+    allowed: false,
+    reason: "Sol og åbningstid kan ikke bekræftes lige nu.",
+    until: 0,
+  }),
+  development = false,
   origin,
   limit = 100,
 } = {}) {
@@ -78,6 +85,13 @@ export function createApi({
   db.prepare(
     "DELETE FROM gatherings WHERE datetime(starts_at, '+' || duration || ' minutes', '+30 days') < datetime('now')",
   ).run();
+  const handleGoldenHour = createGoldenHourApi({
+    db,
+    getSunEligibility,
+    development,
+    readBody,
+    json,
+  });
   // Shared per-process budget for the single-server pilot. Never trust a client-
   // supplied forwarding header as identity. Distributed hosting needs a shared limiter.
   let windowEnd = 0,
@@ -98,9 +112,14 @@ export function createApi({
         });
       if (["POST", "PATCH", "DELETE"].includes(method)) {
         const source = request.headers.get("origin");
-        if (source && source !== (origin || url.origin))
+        const allowedOrigins = Array.isArray(origin)
+          ? origin
+          : [origin || url.origin];
+        if (source && !allowedOrigins.includes(source))
           return error("Ogiltigt ursprung.", 403);
       }
+      const goldenHour = await handleGoldenHour(request, path, method);
+      if (goldenHour) return goldenHour;
       if (path === "/api/weather") {
         if (method !== "GET") return error("Metoden stöds inte.", 405);
         return json(await getWeather());

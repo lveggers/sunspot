@@ -6,6 +6,9 @@ import { clock, durationLabel } from "./lib.js";
 export function solarLabel(result) {
   if (!result) return "Solläge saknas";
   if (!result.eligible) return "Ingen uteservering enligt OSM";
+  if (result.state === "weather-unknown") return "Väder för sol saknas";
+  if (result.state === "cloud") return "Moln eller dimma i prognosen";
+  if (result.state === "rain") return "Nederbörd i prognosen";
   if (result.state === "unknown") return "Solläge okänt";
   if (result.state === "shade") return "I byggnadsskugga";
   if (result.park)
@@ -65,7 +68,13 @@ export default function SolarWatch({
   if (!place) return null;
   const recommendations =
     result && !pending
-      ? recommendNext(places, results, id, instant, duration)
+      ? recommendNext(
+          places.filter((p) => p.id === id || results[p.id]?.state === "sun"),
+          results,
+          id,
+          instant,
+          duration,
+        )
       : [];
   async function enable() {
     try {
@@ -115,7 +124,7 @@ export default function SolarWatch({
         <span>
           {live
             ? "Bevakning medan appen är öppen."
-            : "Dra tidsreglaget för att prova varningen."}
+            : "Ändra klockslaget för att prova varningen."}
         </span>
       </div>
       {permission === "denied" && live && (
@@ -133,8 +142,8 @@ export default function SolarWatch({
         i närheten
       </h3>
       <p className="watch-explainer">
-        Sol efter uppskattad gångtid och under {durationLabel(duration)}.
-        Modellförslag, utan träd eller moln.
+        Beräknad byggnadssol efter gångtid och under {durationLabel(duration)}.
+        Vädret kontrolleras vid vald tid; moln kan ändras. Träd ingår inte.
       </p>
       <div className="next-places">
         {recommendations.map(

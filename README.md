@@ -5,6 +5,25 @@ restaurants in Copenhagen, choose a time and invite friends.
 
 ## Run locally
 
+With Docker:
+
+```bash
+docker compose up -d --build
+```
+
+Open [127.0.0.1:3085](http://127.0.0.1:3085); no login is required. Source
+changes reload automatically. Set `SUNSPOT_PORT` to use another local port.
+Optional `.env.local` values are loaded; invitation storage and the public
+origin are always local. The private Docker subnet can be overridden with
+`SUNSPOT_SUBNET` if it conflicts with another local network.
+Invitations and weather cache persist in the
+`sunspot-development_data` Docker volume. Stop with `docker compose down`
+without `--volumes` to retain them. After changing dependencies, stop the
+app, rebuild, and run `docker compose run --rm app npm ci` before starting
+it again.
+
+Without Docker:
+
 Use Node 24 (`nvm use`; `.nvmrc` is included), or Node 22.13+ /
 24.x / 26+ per `package.json`'s `engines`:
 
@@ -19,23 +38,47 @@ excluded from Git.
 
 ## What's included
 
-- Full-screen map, compact mobile controls and a continuous seven-day time
-  slider. Nearby places form tappable groups at city scale; search and the
-  list retain the full selection.
-- Touchgrass, bar, restaurant and event filters; partial shade does not
+- An area, day and time finder, starting at the current Copenhagen time.
+  Choose a district or search within 1.5 km of your location, then find up
+  to eight ranked places on a focused map, get walking directions and
+  invite friends. Dates cover the next seven days.
+- Independent park, bar and restaurant filters; partial shade does not
   exclude an entire park.
 - 163 places, 139 OSM park areas and a building-shadow model with 19,523
   buildings. Solar analysis and shadow rasterization run in separate Web
   Workers and follow the selected time. Older browsers use a throttled
   canvas fallback.
-- Real events from Københavns Biblioteker, plus one manually-verified
-  curated listing, with a weekly discovery list and rich event details.
-  Markers follow event start/end times; fictional demo events are optional
-  and off by default.
 - MET Norway forecasts for the selected time, invitations, guest RSVPs and
   host cancellation.
+- Sunny and confirmed-open places are the default. Cloud, precipitation,
+  stale or unavailable forecasts and unknown opening hours are excluded
+  from that selection; the filters allow inspecting other conditions.
 - Editable seating points and in-app solar warnings. System notifications
   require user activation and a running app; this is not background push.
+- Golden Hour offers with drink-specific paper cutouts, public offer links
+  and one-hour phone vouchers. Partner activation and new claims require
+  server-verified building exposure, fresh weather and confirmed opening.
+  A claimed voucher keeps its original expiry and can be redeemed once.
+
+## Partner portal
+
+Open [/partner](http://127.0.0.1:3085/partner). In Docker development, use
+the **Fyll i lokal demoinloggning** button or the synthetic account
+`demo@sunspot.local` / `sunspot-local-demo`. This account belongs to the
+local Café Stefanshus demonstration; its offers and vouchers are explicitly
+marked as demo. The initial offer is a private draft, never an active offer.
+Demo access and persisted demo records are disabled in production.
+
+Create an offer draft, then activate it when the server confirms sunshine
+and opening hours at the registered venue. The campaign lasts one hour;
+each visitor's voucher lasts one hour from claiming, even if the campaign
+ends earlier. Changing the phone clock or claiming again cannot extend it.
+The partner portal validates the voucher before marking it redeemed.
+
+Partner accounts are bound to their venue and use hashed passwords and
+expiring cookie sessions. Real partner account provisioning and agreements
+are required before a live launch; no real partnerships or offers are
+created by this development setup.
 
 ## Verification
 
@@ -45,14 +88,34 @@ npm run lint
 npm run build
 npm run test:browser     # requires a running app on port 3000
 npm run test:solar
-npm run test:events      # event feed, mobile details and timeline behaviour
 npm run test:map         # grouping, mobile layout, worker/fallback and responsiveness
+npm run test:golden-hour # offer/partner UI, sharing and server-anchored voucher states
 ```
 
 For browser tests, install Chromium with `npx playwright install chromium`,
 or set `SUNSPOT_BROWSER_PATH` to an existing Chrome executable. Override
 the app URL with `SUNSPOT_URL=http://localhost:4174`. Tests create and
 cancel their own local invitations.
+
+With the Docker development app running, install the browser inside the
+container and run the checks there:
+
+```bash
+docker compose exec app npx playwright install --with-deps chromium
+docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:browser
+docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:solar
+docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:map
+docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:golden-hour
+```
+
+Use your configured port if `SUNSPOT_PORT` differs. Browser dependencies
+must be reinstalled after recreating the development container.
+Run browser checks sequentially. Production builds use a separate container
+and private Next.js cache:
+
+```bash
+docker compose run --rm --no-deps -e NODE_ENV=production app npm run build
+```
 
 ## Runtime and deployment
 
@@ -63,10 +126,10 @@ origin when running behind a reverse proxy so mutation-origin checks use
 the correct host and scheme. The local SQLite pilot targets one server and
 has a shared API request budget of 100 requests/minute per process.
 
-**Invitations are not ready for Vercel deployment.** The Vercel runtime
-explicitly returns a 503 response for invitation APIs rather than storing
+**Invitations and Golden Hour require persistent hosting.** The Vercel runtime
+explicitly returns a 503 response for these APIs rather than storing
 them in a temporary filesystem (no persistent disk there). Map, solar
-analysis, events and forecasts all work fine on Vercel — a shared database
+analysis and forecasts all work fine on Vercel — a shared database
 is the next deployment work needed before invitations work there too.
 
 Deployed at [sunspot-sigma.vercel.app](https://sunspot-sigma.vercel.app).
@@ -84,8 +147,6 @@ areas are approximate snapshots, not verified business availability.
   [Data provenance](data/README.md).
 - [MET Norway Locationforecast](https://api.met.no/weatherapi/locationforecast/2.0/documentation):
   weather forecasts.
-- [Københavns Biblioteker](https://bibliotek.kk.dk/api/v1/events): live
-  public event feed; [event sources and limitations](docs/15-eventkallor.md).
 
 ## History
 

@@ -1,5 +1,5 @@
 // Only render markers in the visible map. Stable world-grid cells keep groups
-// from jumping between buckets when the user pans. Events retain their identity.
+// from jumping between buckets when the user pans.
 export function groupMapMarkers(
   items,
   { project, bounds, zoom, selectedId, cellSize = 76 },
@@ -14,7 +14,7 @@ export function groupMapMarkers(
       item.lng > bounds.east
     )
       continue;
-    if (zoom >= 17 || item.id === selectedId || item.category === "event") {
+    if (zoom >= 17 || item.id === selectedId) {
       singles.push({ ...item, markerId: item.id });
       continue;
     }
