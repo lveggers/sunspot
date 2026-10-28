@@ -133,7 +133,7 @@ try {
     await page.getByRole("button", { name, exact: true }).click();
   await find();
   await expect(page.locator('.finder-empty[data-experience="empty.no-types"] > p')).toHaveText(
-    "Inga typer valda. Välj minst en. Vi gissar inte åt dig.",
+    "Välj park, bar eller mat för att se platser.",
   );
   await expect(page.locator(".finder-empty").getByRole("button", { name: "Välj område och typer", exact: true })).toBeVisible();
   await expect(page.locator(".place-pin")).toHaveCount(0);
@@ -173,7 +173,7 @@ try {
   await page.evaluate(() =>
     document.dispatchEvent(new Event("visibilitychange")),
   );
-  await expect(page.locator('.finder-empty[data-experience="weather.cloud"] > p')).toHaveText("Himlen har dragit för gardinen och låtsas inte vara hemma.");
+  await expect(page.locator('.finder-empty[data-experience="weather.cloud"] > p')).toHaveText("Prognosen visar moln. Prova en annan tid för att hitta sol.");
   await expect(page.locator(".place-pin")).toHaveCount(0);
   weatherMode = "clear";
   await page.evaluate(() =>
@@ -232,9 +232,9 @@ try {
   await guestContext.close();
 
   for (const [mode, moment, message, action] of [
-    ["cloud", "weather.cloud", "Himlen har dragit för gardinen och låtsas inte vara hemma.", "Välj en annan tid"],
-    ["rain", "weather.rain", "Det regnar. Vi hittar inte på sol. Prova en senare tid.", "Välj en annan tid"],
-    ["missing", "weather.missing", "Vi saknar väderdata för den tiden. Vi gissar inte om himlen.", "Hämta vädret igen"],
+    ["cloud", "weather.cloud", "Prognosen visar moln. Prova en annan tid för att hitta sol.", "Välj en annan tid"],
+    ["rain", "weather.rain", "Prognosen visar nederbörd. Prova en annan tid.", "Välj en annan tid"],
+    ["missing", "weather.missing", "Det finns ingen väderprognos för den valda tiden. Försök hämta vädret igen.", "Hämta vädret igen"],
   ]) {
     weatherMode = mode;
     await open();
@@ -315,8 +315,8 @@ try {
   ).toBeVisible();
   await geoContext.close();
   for (const [position, permissions, moment, message] of [
-    [{ latitude: 56, longitude: 10 }, ["geolocation"], "empty.outside", "Du är utanför Köpenhamn. Vi täcker inte resten ännu. Välj ett område i stan."],
-    [{ latitude: 55.69, longitude: 12.55 }, [], "empty.location", "Du sa nej till plats. Välj ett område. Så låtsas vi att det var planen."],
+    [{ latitude: 56, longitude: 10 }, ["geolocation"], "empty.outside", "SunSpot täcker Köpenhamn. Välj ett område i staden."],
+    [{ latitude: 55.69, longitude: 12.55 }, [], "empty.location", "Välj ett område manuellt eller tillåt åtkomst till din plats."],
   ]) {
     const scenario = await browser.newContext({
       geolocation: position,

@@ -27,7 +27,8 @@ Mødets afsnit om andre bygge-/ejendomsprojekter er udeladt fra SunSpot-kravene.
 - Overskyet vejr uden sol skal have en karakter, der er sur over skyerne.
 - Golden Hour skal vise en siddende karakter med øl eller drink efter partnerens faktiske valg.
 - Synligt, vedvarende sprogskift mellem dansk, engelsk og svensk.
-- Tør, karikeret, lidt offensiv dansk voksenhumor med social akavethed og Klovn-vibes som tonereference. Teksterne er originale.
+- Seneste tonekrav (28. oktober): fjern sarkasme og overdrevent vittige bemærkninger. Brug neutral, kort og hjælpsom tekst på alle tre sprog. Dette erstatter den tidligere humoristiske tekstretning.
+- Astra skal planlægge animationer; de skal ikke implementeres som del af denne tekstopdatering.
 - De ni godkendte karakteridentiteter og deres grafiske stil bevares.
 - Erstat shademap-visningen med et kort, hvor bekræftede solsteder fremhæves i farver og resten dæmpes i gråt. Skyer skal indgå i beslutningen.
 

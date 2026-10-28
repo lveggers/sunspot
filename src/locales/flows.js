@@ -95,9 +95,9 @@ const flows = {
     "sv": "Hämtar kupongen…"
   },
   "flows.voucher.back": {
-    "da": "Tilbage til solen",
-    "en": "Back to the sun",
-    "sv": "Tillbaka till solen"
+    "da": "Tilbage til kortet",
+    "en": "Back to the map",
+    "sv": "Tillbaka till kartan"
   },
   "flows.offer.loading": {
     "da": "Henter din Golden Hour…",
@@ -150,9 +150,9 @@ const flows = {
     "sv": "Golden hour erbjudanden"
   },
   "flows.discovery.heading": {
-    "da": "Golden Hour, nogen?",
-    "en": "Golden Hour, anyone?",
-    "sv": "Golden hour, någon?"
+    "da": "Golden Hour",
+    "en": "Golden Hour",
+    "sv": "Golden Hour"
   },
   "flows.discovery.loading": {
     "da": "Leder efter tilbud i solen…",
@@ -190,19 +190,19 @@ const flows = {
     "sv": "Alla erbjudanden"
   },
   "flows.discovery.kicker": {
-    "da": "EN GOD UNDSKYLDNING.",
-    "en": "A PERFECTLY GOOD EXCUSE.",
-    "sv": "EN BRA URSÄKT."
+    "da": "GOLDEN HOUR-TILBUD",
+    "en": "GOLDEN HOUR OFFERS",
+    "sv": "GOLDEN HOUR-ERBJUDANDEN"
   },
   "flows.discovery.questionTop": {
-    "da": "Skal vi tage",
-    "en": "One more,",
-    "sv": "Ska vi ta"
+    "da": "Aktuelle",
+    "en": "Current",
+    "sv": "Aktuella"
   },
   "flows.discovery.questionBottom": {
-    "da": "én mere?",
-    "en": "then?",
-    "sv": "en till?"
+    "da": "tilbud",
+    "en": "offers",
+    "sv": "erbjudanden"
   },
   "flows.discovery.help": {
     "da": "Midlertidige tilbud fra steder med sol og åbent lige nu. Hent en kupon, gå derhen og vis den til personalet.",
@@ -250,19 +250,19 @@ const flows = {
     "sv": "Till kartan"
   },
   "flows.partner.kicker": {
-    "da": "DIT STED. DERES GOLDEN HOUR.",
-    "en": "YOUR PLACE. THEIR GOLDEN HOUR.",
-    "sv": "DITT STÄLLE. DERAS GOLDEN HOUR."
+    "da": "TILBUD TIL DIT STED",
+    "en": "OFFERS FOR YOUR VENUE",
+    "sv": "ERBJUDANDEN FÖR DITT STÄLLE"
   },
   "flows.partner.sun": {
-    "da": "Har du sol?",
-    "en": "Got sunshine?",
-    "sv": "Har du sol?"
+    "da": "Golden Hour",
+    "en": "Golden Hour",
+    "sv": "Golden Hour"
   },
   "flows.partner.cheers": {
-    "da": "Skål med os.",
-    "en": "Cheers to that.",
-    "sv": "Skåla med oss."
+    "da": "til dit sted",
+    "en": "for your venue",
+    "sv": "för ditt ställe"
   },
   "flows.partner.intro": {
     "da": "Opret et tilbud til dit sted. Aktivér det, når der er åbent, og solen faktisk er fremme.",
@@ -335,9 +335,9 @@ const flows = {
     "sv": "LOKAL DEMO · ERBJUDANDEN OCH KUPONGER ÄR INTE VERKLIGA"
   },
   "flows.partner.createHeading": {
-    "da": "Dæk op til Golden Hour.",
-    "en": "Set the table for Golden Hour.",
-    "sv": "Duka för golden hour."
+    "da": "Opret et tilbud",
+    "en": "Create an offer",
+    "sv": "Skapa ett erbjudande"
   },
   "flows.partner.draftHelp": {
     "da": "Et nyt tilbud starter som kladde og hører altid til {place}.",

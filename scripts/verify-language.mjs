@@ -8,17 +8,17 @@ const copy = {
   da: {
     language: "Sprog", find: "Find min plads i solen", near: "Nær mig", today: "I dag",
     claim: "Hent min kupon · 1 time", code: "Kuponkode", locale: "da-DK",
-    locationError: "Du sagde nej til position. Vælg et område. Så lader vi som om, det var planen.",
+    locationError: "Vælg et område manuelt, eller tillad adgang til din position.",
   },
   en: {
     language: "Language", find: "Find my spot in the sun", near: "Near me", today: "Today",
     claim: "Get my voucher · 1 hour", code: "Voucher code", locale: "en-GB",
-    locationError: "You said no to location. Pick an area. We'll pretend that was the plan.",
+    locationError: "Choose an area manually or allow access to your location.",
   },
   sv: {
     language: "Språk", find: "Hitta min plats i solen", near: "Nära mig", today: "Idag",
     claim: "Hämta min kupong · 1 timme", code: "Kupongkod", locale: "sv-SE",
-    locationError: "Du sa nej till plats. Välj ett område. Så låtsas vi att det var planen.",
+    locationError: "Välj ett område manuellt eller tillåt åtkomst till din plats.",
   },
 };
 const browser = await chromium.launch({ executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined });
@@ -160,6 +160,12 @@ try {
   await expect(page.locator(".golden-price")).toHaveText(money("sv"));
   await setLanguage("en");
   await expect(page.locator(".golden-price")).toHaveText(money("en"));
+  await setLanguage("da");
+  await page.setViewportSize({ width: 390, height: 667 });
+  await expect(page.getByRole("button", { name: copy.da.claim, exact: true })).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: "artifacts/language-offer-da-mobile.png" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await setLanguage("en");
   await page.getByRole("button", { name: copy.en.claim, exact: true }).click();
   await expect(page.getByRole("textbox", { name: copy.en.code, exact: true })).toHaveValue(voucher.id);
   assert.equal(mutations.claims, 1);

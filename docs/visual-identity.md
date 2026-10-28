@@ -1,6 +1,6 @@
 # SunSpot — Copenhagen paper theatre
 
-A practical map with a handmade, slightly absurd cast of Copenhagen adults. The illustrations carry the humor; the interface stays quiet and useful.
+A practical map with a handmade, slightly absurd cast of Copenhagen adults. The cast keeps its expressive visual style; interface text is neutral, concise and useful.
 
 The cast now lives throughout the app. The three new characters welcome visitors in the finder; the blue coat, football shirt and stripes lead the park, bar and food choices and their place cards. Other figures accompany search results, empty states, invitations and RSVP choices. Golden Hour uses the puffer as its entrance and recurring characters alongside offer and voucher artwork.
 
@@ -55,4 +55,4 @@ Buttons in the new theatre layer are at least 44 pixels high, image dimensions p
 
 The language selector supports Danish (default), English and Swedish across the finder, map, offers, vouchers, invitations and partner portal. A validated preference cookie keeps server-rendered document language and later navigation consistent. Dates and money use the selected locale; Copenhagen time, coordinates, machine values, voucher codes, expiry and user-authored messages remain unchanged. Open dialogs have their own selector.
 
-The source requirements are recorded in `jurnie-requirements-2026-10-26.md`. Fable's situation, tone and illustration plan is in `character-experience-plan.md`. Five new transparent pose files supplement the standing cutout sheet: angry/cloudy, rain shelter, cycling, seated beer and seated cocktail. Weather, offer, voucher and invitation selectors choose deterministic moments; localized dry humor explains each state without changing its data. The map uses a faded grey base and normal-color context windows around confirmed sunny, open places. Clouds, rain, stale or uncertain forecasts and night suppress those windows; their edges are not physical sunlight boundaries.
+The source requirements are recorded in `jurnie-requirements-2026-10-26.md`. The current situation and illustration plan is in `character-experience-plan.md`. Five new transparent pose files supplement the standing cutout sheet: angry/cloudy, rain shelter, cycling, seated beer and seated cocktail. Weather, offer, voucher and invitation selectors choose deterministic moments; neutral localized copy explains each state without changing its data. Astra's proposed animation direction is recorded in `character-animation-plan.md`; new animation is not implemented in this copy update. The map uses a faded grey base and normal-color context windows around confirmed sunny, open places. Clouds, rain, stale or uncertain forecasts and night suppress those windows; their edges are not physical sunlight boundaries.

@@ -1,252 +1,82 @@
-# SunSpot — plan for situationsbestemte karakterer
+# SunSpot — karakterer og situationer
 
-Plan, 28. oktober 2026. Udarbejdet af Fable (`claude-fable-5-1`) i to gennemløb og gennemgået mod projektets kode og kildekrav. Den oprindelige modelbesvarelse er bevaret i chatens artefakter. **J** henviser til [Jurnie-kravene](jurnie-requirements-2026-10-26.md); **U** er de supplerende brugerkrav i samme dokument; **A** er planens anbefalinger. U-numre er rækkefølgen i dokumentets liste.
+Opdateret 28. oktober 2026. Den oprindelige situations- og illustrationsplan blev udarbejdet med Fable. Brugerens seneste instruktion erstatter den tidligere humoristiske tekstretning: al apptekst skal nu være kort, neutral og hjælpsom. Karakterernes identiteter og udtryk bevares.
 
-## Leverancestatus
+Kildekravene findes i [Jurnie-kravene](jurnie-requirements-2026-10-26.md). Astra planlægger bevægelse separat i [animationsplanen](character-animation-plan.md); denne tekstopdatering implementerer ikke nye animationer.
 
-**Implementeret nu:** datastyrede karakterer på forsiden, i tomme tilstande, tilbud, kuponer og invitationer; den sure skyfigur, regnposituren, cyklisten på cyklen og de to siddende øl-/cocktailpositurer. De originale situationstekster følger dansk, engelsk og svensk. Invitationer henter prognosen for deres faktiske tidspunkt; ja, måske og nej forbliver separate tal. Sprogskift og vejr ændrer ikke en eksisterende kupons udløb.
+## Implementeret
 
-Kortet viser nu almindelige farver omkring bekræftede, åbne solsteder og dæmper resten i gråt. Farver kræver frisk solprognose, beregnet dagslys og bekræftet bygningssol. Skyer, regn, manglende/usikre data og ventende beregninger giver ingen fremhævning. Farvevinduerne viser kortkontekst omkring solpunkter, ikke en opmålt fysisk solgrænse. Dette er et supplerende brugerkrav fra samme chat, ikke et nyt Jurnie-krav.
+- Karakterer vælges ud fra vejr, tidspunkt, søgefiltre, tilbud, kuponer og invitationer.
+- Fem transparente PNG-positurer: sur over skyer, stofpose som regnskærm, cykling, siddende med øl og siddende med cocktail. Bænkene indgår i de to siddende kompositioner. Separate native SVG-ikoner viser vejr.
+- Det godkendte ni-personers papirark og galleriet er bevaret. Små kategorimarkører er dekoration; en situationsfigur forklarer en konkret tilstand.
+- Dansk, engelsk og svensk med husket sprogvalg. Teksten beskriver status, usikkerhed og næste handling uden sarkasme, vittigheder eller kommentarer om brugerens adfærd.
+- Kortet har en grå, falmet basis og normale farver omkring bekræftede, åbne solsteder. Farvevinduerne er kortkontekst omkring beregningspunkter, ikke opmålte fysiske solgrænser.
 
-**Illustrationsleverance:** fem separate transparente, responsivt optimerede PNG-positurer. Bænken indgår i de to siddende figurers færdige kompositioner. Sol, sky, regn og måne genbruger de eksisterende native SVG-ikoner i separate dekorative lag. Det godkendte ni-personers papirark og galleriet er bevaret.
+## Tekstregler
 
-**Senere arbejde:** pakken L1–L8 efter første brugertest, flere byer, nye drikketyper, push om kommende sol og mulighed for at foreslå et andet invitationstidspunkt. Disse udvidelser er ikke del af denne leverance.
+Brug almindelige ord og korte sætninger. Beskriv det, data kan bekræfte. Forklar, hvad brugeren kan gøre. Ukendte eller forældede data skal fremgå tydeligt. Undgå personificering af vejret, ironiske overskrifter, salgsjokes og vurderinger af brugerens valg. Figuren må fortsat have et genkendeligt udtryk.
 
-## Kontekst
+De aktuelle tekster findes i `src/locales/characterExperience.js`, `offerExperience.js` og `invitationExperience.js`, suppleret af de fælles kataloger. Katalogerne er den autoritative tekstkilde; planen kopierer ikke teksterne, så de ikke kommer ud af takt. Alle tre sprog skal have samme betydning og bevare de samme datafelter. Partnerens tilbudstekst, stednavne og brugernes beskeder bevares som skrevet.
 
-Appen har kort, typerne park/bar/mad, tidspunkt, vejr fra MET Norway med flagene `weather.available` og `weather.stale`, beregnet solhøjde, beregnet bygningssol pr. sted, rutevejledning som åbner en gårute i Google Maps, invitation med svar ja/måske/nej, og Golden Hour-tilbud med `offer.kind` (beer/cocktail) og kupon. Serveren verificerer sol, vejr og åbent efter sin egen regel. Appen har ingen reverse-geocoder, ingen beregning af næste åbningstid og ingen egen rute-ETA. Ni karakterer er godkendt og vises gennem én fælles komponent. Implementeringen giver hver figur en fast rolle pr. flade og binder teksterne til tilgængelige datafelter. DA/EN/SV med husket valg er implementeret i arbejdstræet. Invitationssiden henter nu prognosen for invitationens tidspunkt; manglende, gamle eller udækkede data vises som usikre.
+## Kerneflow
 
-## 1. Kerneflow og de fem karakterøjeblikke
+Område eller nær mig + tidspunkt + uafhængige park/bar/mad-filtre → op til otte udvalgte steder → gårute eller invitation. Typerne kombineres med OR; alle typer slået fra giver et tomt udvalg. Skygge/usikker sol og ikke-bekræftet åbent er skjult som standard. København er første dækningsområde. Den eksterne events-funktion er fjernet.
 
-Flowet følger J7: hvor (nær mig eller valgt område) + hvornår (nu er standard, J5) + typerne park, bar og mad som uafhængige til/fra (J2). Valgte typer lægges sammen. Et sted vises når det matcher mindst én valgt type. Er alle typer slået fra, er udvalget tomt, og appen beder om mindst én type. Udvalget skjuler skygge, usikker sollæg og ubekræftet åbent som standard (J8). Derefter "Kør mig derhen" og "Inviter" (J4). Events er ude (J3). København er eneste by (J6). Skyer og regn vægter over bygningssol (J1).
+## Situationer
 
-Karaktererne optræder fem steder. Kortet får ingen figur (J9).
-
-| Prio | Øjeblik | Hvad figuren gør | Krav |
+| # | Situation og grundlag | Figur | Næste handling |
 |---|---|---|---|
-| 1 | Vejr-hero på forsiden | Viser vejr nu eller for valgt tidspunkt. Sur ved skyer. | U2, J1 |
-| 1 | Golden Hour-kort | Siddende figur efter `offer.kind`. | U3, J10 |
-| 1 | Tomme tilstande | Ingen match, ingen typer valgt, position nægtet, udenfor København. | J2, J6, J8 |
-| 2 | Kupon | Gyldig, udløbet, indløst, eksempel, demo. | U3 |
-| 2 | Invitation | Send, svar, aflys. | J4 |
+| 1 | Solmodel, vejr eller position indlæses | Grøn jakke | Vent; søgeknappen er deaktiveret |
+| 2 | Frisk solprognose, dagslys og beregnet sol i det valgte udvalg | Fodboldtrøje + sol | Find et solsted |
+| 3 | Dokumenteret overskyet prognose | Blå skjorte, skypositur | Vælg andet tidspunkt |
+| 4 | Nedbør i prognosen | Striber, stofpose over hovedet | Vælg andet tidspunkt |
+| 5 | Solen er under horisonten ved valgt tidspunkt | Rullekrave + måne | Planlæg i morgen |
+| 6 | Vejrdata mangler, er udækkede eller har ukendt klassifikation | Grøn jakke | Hent vejret igen |
+| 7 | Eksisterende stale-flag er sat | Grøn jakke | Hent en ny prognose |
+| 8 | Solprognose, men intet bekræftet solspot i udvalget | Cyklist | Vælg område eller typer |
+| 9 | Beregnet bygningsskygge rammer snart valgt sted | Cyklist på cykel | Åbn gåruten; vis faktisk beregnet klokkeslæt |
+| 10 | Ingen steder matcher filtre og tidspunkt | Krøller | Tilpas typer, område eller tidspunkt |
+| 11 | Ingen typer valgt | Krøller | Vælg mindst én type |
+| 12 | Intet match er bekræftet åbent, men åbent-filteret skjuler steder | Rullekrave | Vis alle åbningstider |
+| 13 | Adgang til position er afvist | Krøller | Vælg område eller tillad position |
+| 14 | Position er uden for dækningen | Cyklist | Vælg område i København |
+| 15 | Valgt fremtidigt tidspunkt har frisk solprognose og beregnet sol | Striber + sol | Planlæg en aftale |
+| 16 | Valgt tidspunkt har skyer eller nedbør i prognosen | Blå skjorte | Vælg andet tidspunkt |
+| 17 | Sted er valgt og rute kan åbnes | Cyklist på cykel | Åbn Google Maps-gårute |
+| 18 | Invitation er oprettet og har et server-id | Blå frakke + striber | Del invitationslink |
+| 19 | Modtager åbner invitation med frisk solprognose for dens startsAt | Fodboldtrøje + sol | Svar ja, måske eller nej |
+| 20 | Invitationens tidspunkt har skyer eller nedbør i prognosen | Blå skjorte | Svar på invitation |
+| 21 | Svar er gemt eller vært har modtaget svar | Blå frakke; små ja-markører | Se tre separate svartal eller åbn rute |
+| 22 | Vært har aflyst | Rullekrave | Planlæg ny aftale |
+| 23 | Ingen aktuelle tilbud | Ingen drikkefigur | Tilbage til steder |
+| 24 | Claimable øltilbud | Rød puffer siddende med øl | Hent kupon |
+| 25 | Claimable cocktailtilbud | Blå frakke siddende med cocktail | Hent kupon |
+| 26 | Claim afventer svar | Samme drikkefigur, dæmpet | Vent på kontrol |
+| 27 | Claim er afvist | Blå skjorte uden påstået vejr | Vis lokaliseret faktisk grund |
+| 28 | Kupon er gyldig efter serverforankret tid | Siddende figur efter kind | Vis kode og nedtælling til personalet |
+| 29 | expiresAt er passeret, uden redeemedAt | Siddende figur, dæmpet | Se udløbstid eller gå til steder |
+| 30 | redeemedAt findes | Siddende figur | Vis indløsningstid |
+| 31 | Simuleret øleksempel | Rød puffer + tydelig eksempelmærkning | Prøv lokal ugyldig eksempelkupon |
+| 32 | Lokalt syntetisk partnerflow i udvikling | Figur efter kind + tydelig testmærkning | Test login, aktivering, claim og indløsning lokalt |
 
-Ingen stor situationsfigur i resultatlisten. Den store figur bor i hero og tilbudskort; små kategorimarkører bevares som dekoration.
+## Valg og datagrænser
 
-## 2. Rollefordeling
+Hver flade har et selvstændigt, deterministisk valg. `selectWeatherMoment` og `selectEmptyMoment` vælger finderens tilstand. `selectOfferMoment`, `selectVoucherMoment` og `selectExampleMoment` håndterer tilbud. `selectInvitationMoment` vælger invitationens tilstand. En ændring i heroens vejr ændrer aldrig en eksisterende kupon.
 
-Ni godkendte identiteter, ingen nye. Hver får ét fast ansvar.
+Vejrprioritet: indlæsning → nat → manglende prognose/dækning → stale → unknown → nedbør → skyer → sol uden solsted → sol med solsted. Ved planlagte tidspunkter har sol og gråt vejr særskilte tekster. Nat kan beregnes lokalt; manglende vejrdata oplyses stadig. `sun`, `cloud`, `rain` og `unknown` kommer fra `sunshineWeather(weather, instant).state`, ikke rå MET-symboler. Ingen ny vilkårlig udløbsgrænse er indført.
 
-| Id | Rolle | Hvorfor den passer |
-|---|---|---|
-| football | Sol bekræftet, invitation med sol i udsigten | Solbriller og grin. Flasken er godkendt udseende og aldrig et tilbud. |
-| blue-shirt | Dokumenteret cloud, afvist claim, gråt planlagt tidspunkt | Korslagte arme. Skal kun kigge op. |
-| stripes | Regn, planlægning frem i tid | Stofposen kan holdes over hovedet. |
-| turtleneck | Nat, ubekræftet åbent, aflysning | Hænder bag ryggen. Rolig og lidt træt. |
-| green-jacket | Loading, vejrdata mangler, stale, tidspunkt uden for prognosen | Hånd på hage. Venter og tvivler. |
-| curls | Ingen match, ingen typer valgt, position nægtet | Hånd på hofte. Utålmodig. |
-| cyclist | Udenfor område, afsted, bygningsskygge på vej | Cyklen er bevægelse. Rollen holder, selv om ruten åbner som gårute. |
-| puffer | Golden Hour med `offer.kind=beer` | Har allerede ølglas. |
-| blue-coat | Golden Hour med `offer.kind=cocktail`, invitation | Frakke og hoops. Byens aften. |
+Kortfarver kræver `weatherState=sun`, dagslys, færdig beregning, `eligible=true`, `state=sun` og `opening.state=open`. Manglende, forældet eller usikkert vejr giver ingen farve. Det samme gælder skyer, regn og nat. Solmodellen og muligheden for at vælge et siddepunkt er bevaret; det gamle shadow-overlay er fjernet fra visningen.
 
-## 3. Situationsmatrix
+Drikkefiguren følger kun `offer.kind`: beer giver puffer, cocktail giver blå frakke, ukendt type giver ingen drikkefigur. Et aktivt tilbud er ikke nødvendigvis claimable. Serveren afgør sol, vejr, åbent, aktivering og claim. `offer.activeUntil` er kampagnens sluttid; `offer.eligibleUntil` er den beregnede solgrænse; `voucher.expiresAt` er kuponens selvstændige udløb. De må ikke blandes sammen. Glasformen lover ikke en bestemt størrelse eller opskrift.
 
-"Grundlag" er de data figuren reagerer på. Tekst er dansk. Alt i krøllede parenteser er et datafelt med kilde i tabellen efter matrixen. Prio 1 skal med i første leverance.
+Kuponstatus: `redeemedAt` har prioritet, derefter passeret `expiresAt`, ellers gyldig. Nedtællingen bruger eksisterende serverNow og monotont lokalt forløb. Gentaget claim kan returnere samme kupon uden ny udløbstid. Sprog, vejr, animation og kampagnestatus må ikke forlænge tiden. Serveren afgør endelig gyldighed ved indløsning.
 
-| # | Situation | Grundlag | Brugeren vil | Figur, pose, prop | Tekst (DA) | Næste handling | Prio |
-|---|---|---|---|---|---|---|---|
-| 1 | Opstart | weather eller position = loading | Finde sol nu | green-jacket, hånd på hage, dæmpet | "Vi kigger op. Vent lidt." | Hovedknap deaktiveret | 1 |
-| 2 | Sol bekræftet | available, ikke stale, vejrtilstand sun, solhøjde over horisont, ≥1 sted med bygningssol=sun | Finde sol nu | football, sol-lag bag | "Sol over {placeName}. Du scroller stadig. Folk kan se det." | "Find sol nu" | 1 |
-| 3 | Overskyet | vejrtilstand cloud, dag | Finde sol nu | blue-shirt, korslagte arme, kigger op, sky-lag | "Overskyet. Himlen har trukket gardinet for og lader som om den ikke er hjemme." | Vælg senere tidspunkt | 1 |
-| 4 | Regn | vejrtilstand rain | Finde sol nu | stripes, stofpose over hovedet, regn-lag | "Det regner. Vi viser ingen sol vi ikke har." | Vælg senere tidspunkt | 1 |
-| 5 | Nat | beregnet solhøjde under horisont, uanset vejrdata | Finde sol nu | turtleneck, måne-lag, datastatus-linje hvis vejr mangler | "Solen er gået hjem uden at sige farvel. Planlæg i morgen." | Planlæg i morgen | 1 |
-| 6 | Vejrdata mangler eller er usikre | `available=false`, tidspunkt uden for prognosens dækning eller frisk prognose med tilstand unknown | Finde sol nu | green-jacket, grå baggrund | "Vi kan ikke bekræfte vejret for det tidspunkt. Vi gætter ikke på himlen." | Prøv igen | 1 |
-| 7 | Stale | `stale=true` | Finde sol nu | green-jacket + datastatus-linje | "Vejrdata er gamle. Himlen kan have skiftet mening imens." | Opdater | 1 |
-| 8 | Sol i prognosen, intet bekræftet solspot | vejrtilstand sun, alle steder bygningssol shade/unknown | Finde sol nær mig | cyclist, peger ud af kortet | "Sol i udsigten. Intet bekræftet solspot her. Prøv et større område." | Udvid område | 2 |
-| 9 | Bygningsskygge på vej | solvarsel: beregnet skygge rammer valgt sted kl. {shadeAt} | Komme afsted | cyclist på cykel | "Husene tager solen kl. {shadeAt}. Gå nu, eller sid i skyggen og kald det et valg." | Kør mig derhen | 2 |
-| 10 | Ingen match | 0 steder matcher valgte typer, tidspunkt og sol-/åbent-filtre | Finde et sted | curls, hånd på hofte | "Ingen steder matcher dine valg lige nu. Slå en type mere til, eller flyt tidspunktet." | Slå type til / skift tid | 1 |
-| 11 | Ingen typer valgt | 0 aktive typer, udvalg tomt | Vælge | curls, lille | "Ingen typer valgt. Udvalget er tomt indtil du vælger mindst én. Vi gætter ikke på dine vegne." | Vælg mindst én type | 2 |
-| 12 | Kun ubekræftet åbent | alle fundne steder uden bekræftet åbent | Finde åbent sted | turtleneck | "Sol i gården. Ingen bekræftet åbningstid. Vi lover ikke en dør der kan være låst." | Vis ubekræftede | 2 |
-| 13 | Position nægtet | geolocation denied | Finde sol nær mig | curls, hånd på hofte | "Du sagde nej til at dele position. Helt i orden. Vælg et område. Så lader vi som om, det var planen." | Vælg område | 1 |
-| 14 | Udenfor København | position uden for dækning | Finde sol nær mig | cyclist, peger | "Du er uden for København. Vi dækker ikke resten endnu. Vælg et område i byen." | Vælg område i KBH | 1 |
-| 15 | Planlagt, sol i udsigt | valgt tidspunkt inden for prognosen, vejrtilstand sun | Planlægge | stripes, stofpose | "{date} {time}: udsigten siger sol. Udsigten har sagt meget gennem årene." | Del invitation | 2 |
-| 16 | Planlagt, gråt | valgt tidspunkt inden for prognosen, vejrtilstand cloud/rain | Planlægge | blue-shirt | "{date} {time} er gråt i udsigten. Prøv et andet tidspunkt." | Flyt tidspunkt | 2 |
-| 17 | Kør mig derhen | sted valgt, rute åbnes | Komme frem | cyclist, lille i hjørne | "Gåruten åbner i Google Maps. Solen venter ikke. Den har aldrig ventet." | Åbn rute | 2 |
-| 18 | Invitation oprettet | serveren har returneret en oprettet invitation med id | Samle venner | blue-coat + stripes, to små udklip | "Send den. Hvis ingen svarer, var det stedet. Helt sikkert stedet." | Del link | 1 |
-| 19 | Modtager åbner, sol i udsigt | invitation + prognosekobling med sun for tidspunktet | Svare | football | Se eksempel 9 | Ja / Måske / Nej | 1 |
-| 20 | Modtager åbner, gråt i udsigt | invitation + prognosekobling med cloud/rain for tidspunktet | Svare | blue-shirt | "Invitationen gælder stadig. Udsigten for {time} gør ikke. Svar alligevel." | Ja / Måske / Nej. A: "foreslå anden tid" senere | 2 |
-| 21 | Svar talt op | RSVP-liste | Se hvem der kommer | ét lille udklip pr. ja; måske og nej som tal | "{yesCount} ja. {maybeCount} måske. {noCount} nej. Måskerne bliver stående som måske." | Kør mig derhen | 2 |
-| 22 | Aflysning | vært annullerer | Aflyse | turtleneck | "Aflyst. Invitationen er opdateret, og alle ser det næste gang de åbner den." | Ny invitation | 2 |
-| 23 | Ingen aktiv Golden Hour | 0 aktive tilbud i udvalget | Se tilbud | ingen figur | "Ingen tilbud lige nu. Solen koster stadig ingenting." | Ingen | 2 |
-| 24 | Tilgængelig Golden Hour, øl | `offer.claimable=true`, `kind=beer` | Øltilbud i sol | puffer siddende, øl | Se eksempel 3 | Hent kupon | 1 |
-| 25 | Tilgængelig Golden Hour, cocktail | `offer.claimable=true`, `kind=cocktail` | Cocktailtilbud i sol | blue-coat siddende, cocktail | Se eksempel 4 | Hent kupon | 1 |
-| 26 | Ny claim verificeres | claim sendt, svar afventer | Hente kupon | samme siddende figur, dæmpet | "En ny kupon kræver serverens tjek af sol, vejr og åbent. Den stoler ikke på nogen af os." | Vent | 1 |
-| 27 | Claim afvist | server afviser med grund {reason} | Hente kupon | blue-shirt | "Der blev ikke udstedt en ny kupon: {reason}." | Ret den konkrete årsag / tilbage til udvalg | 1 |
-| 28 | Kupon gyldig | ingen `redeemedAt`, og `expiresAt` ligger efter serverforankret nutid | Bruge kupon | siddende figur + kode + nedtælling | "Kode {code}. Gyldig til {expiresAt}. Vis den. Drik den." | Vis til bar | 1 |
-| 29 | Kupon udløbet | ingen `redeemedAt`, og `expiresAt` er passeret | Forstå hvad der skete | siddende figur afmættet | Se eksempel 8 | Tilbage til udvalg | 1 |
-| 30 | Kupon indløst | `redeemedAt` findes; har prioritet over udløb | Bekræfte | siddende figur | "Indløst {redeemedAt}. Det var det. Skål." | Inviter nogen | 1 |
-| 31 | Simuleret eksempel | fast illustreret øleksempel; lokal prøveknap, intet serverclaim | Forstå funktionen | puffer med øl og "EKSEMPEL"-mærke | "Simuleret eksempel. Prøv en ugyldig eksempelkupon. Den virker kun her." | Prøv eksempelkupon | 1 |
-| 32 | Lokalt demo-partnerflow | syntetisk partner i udvikling; demologin og samme aktiverings-/claim-flow | Teste flowet | figur efter `offer.kind`, "DEMO"-mærke | "Demo-partner. Knapperne virker mod den lokale testbackend. Kuponen er ikke et rigtigt tilbud." | Log ind og test det lokale flow | 1 |
+Invitationens vejr bindes til dens faktiske startsAt. Aflysning opdaterer invitationen, men sender ingen besked til modtagerne. Ja, måske og nej tælles separat. UI viser højst ni dekorative ja-figurer og et præcist resterende antal; de tre svartal er altid fulde. Personlige beskeder oversættes ikke.
 
-### Datafelter
+Sprogvalget gemmes i en valideret cookie. Datoer og beløb bruger Intl; København-tid og maskinværdier bevares. EN/SV viser DKK, og priser bevarer op til to decimaler. Formularværdier, fejl, valg og kuponur overlever sprogskift uden nye mutationer.
 
-| Felt | Kilde | Hvis feltet mangler |
-|---|---|---|
-| {placeName} | stedets navn i udvalget | sætningen uden navn |
-| {date}, {time} | valgt tidspunkt via Intl | – |
-| {shadeAt} | beregnet bygningsskygge for valgt sted | række 9 vises ikke |
-| {fetchedAt} | tidsstempel på vejrobjektet, kun hvis det findes | række 7 uden tid |
-| {partner}, {drinkTitle}, {price} | `offer.placeName`, `offer.title`, `offer.priceDkk`; titlen er partnerens tilbudstekst, ikke et særskilt produktnavnfelt | tilbuddet vises ikke |
-| {until} | `offer.activeUntil`, kampagnens sluttid; må ikke fremstilles som solgaranti eller kuponens udløb | tidspunkt udelades |
-| {code}, {expiresAt}, {redeemedAt} | `voucher.id`, `voucher.expiresAt`, `voucher.redeemedAt`, formateret i valgt sprog | intet indløsningstidspunkt, hvis `redeemedAt` mangler |
-| {reason} | serverens afvisningsgrund, kode mappet i ordbogen | "Serveren sagde nej." uden gæt |
-| {yesCount}, {maybeCount}, {noCount} | tre separate optællinger af RSVP-listen | 0 |
-| {hostName} | afsendernavn, kun hvis invitationen gemmer det | "Du er inviteret ud i solen" |
-| {sunrise} | A: kun hvis solmodulet eksponerer solopgang | række 5 uden tid |
+## Kontrol og senere arbejde
 
-## 4. Regler for valg og prioritet
+Eksisterende native tests og browserforløb kontrollerer datagrænser, alpha/crops, ni-personers galleri, mobile primærhandlinger, kortzoom og farvefokus, kuponur, invitation/RSVP/aflysning og de tre sprog. Tekstændringer skal også kontrolleres for mobiloverløb.
 
-### 4.1 Fire separate valg (U, A)
-
-Hver flade har sin egen rene funktion med egne input og egen opslagstabel. Ingen fælles nøgle går på tværs.
-
-| Flade | Input | Output |
-|---|---|---|
-| Weather-hero | loading, `available`, `stale`, vejrtilstand, solhøjde, bygningssol pr. sted, prognosens dækning for valgt tidspunkt | hero-nøgle (#1–9) |
-| Tilbudskort | offer aktiv, `offer.kind`, {until}, claim-status, {reason}, eksempel-/demo-mærke | tilbudsnøgle (#23–27, 31–32) |
-| Kupon | kuponstatus og serverens tidsstempler | kuponnøgle (#28–30) |
-| Invitation | invitationens status, RSVP-liste, vejrtilstand for det inviterede tidspunkt | invitationsnøgle (#18–22) |
-
-Hero ændrer aldrig kuponen eller tilbudskortet. Dekoration findes kun i galleriet, som viser alle ni i fast rækkefølge. Ingen seed, ingen daglig rotation, intet tilfældigt ved render.
-
-### 4.2 Weather-hero: første match vinder
-
-`sun`, `cloud`, `rain` og `unknown` er normaliserede tilstande fra `sunshineWeather(weather, instant).state`, ikke rå MET-symboler. MET leverer bl.a. `clearsky_day` og `partlycloudy_day`; den eksisterende fælles klassifikation genbruges. `available`/`stale` og prognosedækning skal kontrolleres før en positiv solpåstand. Manglende eller usikre data forbliver usikre.
-
-| Rang | Betingelse | Figur | Datastatus-linje |
-|---|---|---|---|
-| 1 | loading | green-jacket, dæmpet | "Henter vejr" |
-| 2 | beregnet solhøjde under horisont | turtleneck | "Vejrdata mangler", kun hvis `available=false` |
-| 3 | `available=false` eller tidspunkt uden for prognosen | green-jacket, grå | "Ingen vejrdata" |
-| 4 | `stale=true` | green-jacket | "Gamle vejrdata" + {fetchedAt} hvis feltet findes |
-| 5 | frisk prognose med tilstand unknown | green-jacket | "Vejret kan ikke bekræftes" |
-| 6 | rain | stripes | ingen |
-| 7 | cloud | blue-shirt | ingen |
-| 8 | sun, 0 steder bygningssol=sun | cyclist | ingen |
-| 9 | sun, ≥1 sted bygningssol=sun | football | ingen |
-
-Nat ligger over manglende vejrdata, fordi solhøjden beregnes lokalt og er sikker. Datastatus vises som en nøgtern linje under figuren. Unknown, missing og stale giver aldrig blue-shirt og aldrig football. Bygningssol=unknown tæller aldrig som sol. For et fremtidigt tidspunkt bruges prognosen for netop den time. Uden dækning gælder rang 3. Ingen ny udløbsgrænse indføres. `stale` kommer fra det eksisterende flag.
-
-### 4.3 Tilbudskort
-
-Drikkerekvisitten følger alene `offer.kind`: beer giver puffer med øl, cocktail giver blue-coat med cocktail, anden værdi giver ingen siddende drikkefigur. Serveren accepterer aktuelt kun beer og cocktail. Et aktivt tilbud (`state=active`) er ikke nødvendigvis tilgængeligt: en ny kupon kræver `claimable=true`, som også afhænger af den aktuelle serverkontrol. Kortet viser {partner}, {drinkTitle}, {price} og kampagnens sluttid {until}; `offer.eligibleUntil` er den aktuelt beregnede solgrænse, og `voucher.expiresAt` er kuponens selvstændige udløb. Disse tider må ikke blandes sammen. Ved afvisning vises serverens faktiske grund. Appen gætter ikke på skyer, lukket eller for sent. Et gentaget claim kan returnere den allerede udstedte kupon uden at genstarte tiden; det er ikke et nyt claim. Serverens verifikationsregel ændres ikke af denne plan.
-
-### 4.4 Kupon
-
-Der findes ikke et serverfelt `coupon=valid/expired/redeemed`. Visningsstatus udledes af kuponens tidsstempler: `redeemedAt` giver indløst og har første prioritet; ellers giver passeret `expiresAt` udløbet; ellers gyldig. Nedtællingen bruger serverens `serverNow` plus lokalt monotont forløb, ikke brugerens vægur. Serveren afgør den endelige gyldighed ved indløsning. Ændret hero, sprog, vejr eller kampagne ændrer ikke en eksisterende kupons `expiresAt`. Udløbet og indløst er endelige.
-
-### 4.5 Invitation
-
-Aflysning opdaterer invitationen. Modtageren ser det ved åbning eller opdatering. Der sendes ingen besked. Svar lagres som ja, måske og nej og tælles separat. Teksten må drille et måske. Den må ikke tælle det som nej eller opfinde svar.
-
-### 4.6 Én stor figur pr. skærm og mærkning
-
-Hero er stor. Siddende figur er mellemstor. Invitation bruger små udklip. Kortet får ingen figur (J9). Simuleret eksempel bærer "EKSEMPEL" og bevarer sin lokale prøveknap med ugyldig eksempelkupon; det må ikke kalde et rigtigt claim. Det nuværende eksempel viser fast øl, ikke en cocktailvariant. Lokalt demo-partnerflow bærer "DEMO", bruger demologin og det almindelige lokale aktiverings-/claim-flow og vises kun i udvikling. Det har ingen separat testclaim-knap. De to mærker blandes ikke.
-
-### 4.7 Undtagelser fra nøglekravet
-
-Hver figur i en tilstandsflade har en nøgle. Galleriet og figurer brugt som genkendelige kategorimarkører er undtaget og dokumenteres som dekoration.
-
-## 5. Illustrationsbestilling
-
-Alle varianter er af eksisterende identiteter i den godkendte stil: fladt ujævnt pap/ink, tunge øjenlåg, mellemstore tydelige pupiller, skæve proportioner, ingen nitter, hele fødder, blik mod beskueren (U6).
-
-### Startpakke: 5 positurer, 1 bænk, 4 prop-lag
-
-| # | Variant | Udtryk | Props | Komposition | Placering | Dækker # |
-|---|---|---|---|---|---|---|
-| S1 | puffer siddende med øl | Tilfreds, lille smil, tunge øjenlåg | Generisk ølglas eller flaske; serverens beer angiver ikke fadøl eller størrelse | Frontal på bænk, fødder synlige, øl ved brystet | Tilbudskort venstre, ca. 40 % af bredden | 24, 26, 28–32 (beer) |
-| S2 | blue-coat siddende med cocktail | Kølig, hagen lidt hævet | Generisk cocktailglas; formen må ikke love en bestemt opskrift eller størrelse | Samme bænk, ben krydset, glas løftet lidt | Tilbudskort venstre | 25, 26, 28–30, 32 (cocktail) |
-| S3 | blue-shirt sur over skyer | Bryn ned, mund flad, blik op | Sky-lag separat | Stående, korslagte arme bevaret, hoved vinklet | Hero, centreret | 3, 16, 20, 27 |
-| S4 | stripes med stofpose over hovedet | Skuldre oppe, øjne halvt lukkede | Stofposen i begge hænder; regn-lag separat | Stående, let foroverbøjet | Hero | 4 |
-| S5 | cyclist på cyklen | Fremad, fokuseret, tørklædet flagrer | Eksisterende cykel | 3/4-profil, fødder på pedaler | Hero ved 8 og 9, lille i hjørne ved 14 og 17 | 8, 9, 14, 17 |
-| B | Bænk | Ét fælles element | Flad pap | Bred nok til S1 og S2 | Tilbudskort | 24–32 |
-| P1–P4 | 3 skyer, regnstriber, sol, måne | Samme ujævne kant | Separate PNG-lag med alfa | Bag figuren | Hero | 2–5 |
-
-Eksisterende stående udklip bruges uændret til green-jacket (1, 6, 7), curls (10, 11, 13), turtleneck (5, 12, 22), football (2, 19), blue-coat og stripes side om side (18) og små udklip i række (21).
-
-### Senere pakke, efter første måling
-
-| # | Variant | Dækker |
-|---|---|---|
-| L1 | puffer med tomt glas | 29 beer |
-| L2 | blue-coat med tomt glas | 29 cocktail |
-| L3 | puffer og blue-coat med hævet glas | 30 |
-| L4 | football tommel op | 19, 21 |
-| L5 | turtleneck med skilt "AFLYST" | 22 |
-| L6 | green-jacket skuldertræk | 6 |
-| L7 | curls peger på kort | 13, 14 |
-| L8 | ny drik | kun hvis serveren får en ny `offer.kind` |
-
-## 6. Sprog DA/EN/SV og tone
-
-### Mekanik (A under U4)
-
-Synlig native vælger med Dansk / English / Svenska i relevante sidehoveder og åbne dialoger. Valget gemmes i en valideret cookie, så første render rammer rigtigt. Den eksisterende fælles ordbog udvides med situationsnøgler; parallel lagring og en ny indstillingsside er ikke nødvendig. Datoer og tider går gennem Intl med da-DK, en-GB og sv-SE. Beløb formateres med Intl som valuta DKK: symbolvisning på dansk, anbefalet kodevisning på engelsk og svensk, med op til to decimaler så partnerens faktiske pris bevares. Rækkefølgen af tal og valuta accepteres som Intl leverer den. "DKK" står synligt i EN og SV, så en svensk læser ikke læser SEK. Delingstekster genereres i afsenderens sprog. Modtagerens side følger modtagerens valg. Afsenderens egen besked bevares som skrevet. Nuværende blandede svensk/dansk ryddes i samme ombæring.
-
-### Tone (U5)
-
-Tørt, voksent, let pinligt. Vejret er en modstander med egen vilje. Brugerens selvhøjtidelighed får et lille skub. Figuren siger det man tænker. Fejltilstande giver én udvej i samme åndedrag. Ingen udråbstegn, ingen emoji. Tal og tider kommer fra datafelter. Vitsen står ved siden af og ændrer aldrig tallet. Ingen påstande om glasstørrelse, medmindre partneren har angivet den.
-
-### 10 eksempler
-
-| # | Situation | DA | EN | SV |
-|---|---|---|---|---|
-| 1 | Overskyet (#3) | Overskyet. Himlen har trukket gardinet for og lader som om den ikke er hjemme. Prøv et senere tidspunkt. | Overcast. The sky has drawn the curtains and is pretending it isn't home. Try a later time. | Mulet. Himlen har dragit för gardinen och låtsas inte vara hemma. Prova en senare tid. |
-| 2 | Sol (#2) | Sol over {placeName}. Du scroller stadig. Folk kan se det. | Sun over {placeName}. You're still scrolling. People can see you. | Sol över {placeName}. Du scrollar fortfarande. Folk ser dig. |
-| 3 | Golden Hour øl (#24) | {drinkTitle} til {price} hos {partner} indtil {until}. Hun har sat sig for længst og holder ikke en plads. | {drinkTitle} for {price} at {partner} until {until}. She sat down ages ago and isn't saving you a seat. | {drinkTitle} för {price} på {partner} till {until}. Hon satte sig för länge sedan och håller ingen plats. |
-| 4 | Golden Hour cocktail (#25) | {drinkTitle} til {price} hos {partner} indtil {until}. Hun kigger ikke op fra glasset, før du står der. | {drinkTitle} for {price} at {partner} until {until}. She won't look up from the glass until you're standing there. | {drinkTitle} för {price} på {partner} till {until}. Hon tittar inte upp från glaset förrän du står där. |
-| 5 | Ingen match (#10) | Ingen steder matcher dine valg lige nu. Slå en type mere til, eller flyt tidspunktet. Solen forhandler ikke. | No places match your choices right now. Turn on another type or move the time. The sun doesn't negotiate. | Inga platser matchar dina val just nu. Slå på en typ till eller flytta tiden. Solen förhandlar inte. |
-| 6 | Position nægtet (#13) | Du sagde nej til at dele position. Helt i orden. Vælg et område på kortet. Så lader vi som om, det var planen. | You said no to sharing your location. Perfectly fine. Pick an area on the map. We'll pretend that was the plan. | Du sa nej till att dela plats. Helt okej. Välj ett område på kartan. Så låtsas vi att det var planen. |
-| 7 | Udenfor område (#14) | Du er uden for København. Vi dækker ikke resten endnu. Vælg et område i byen. | You're outside Copenhagen. We don't cover the rest yet. Pick an area in the city. | Du är utanför Köpenhamn. Vi täcker inte resten ännu. Välj ett område i stan. |
-| 8 | Kupon udløbet (#29) | Udløbet {expiresAt}. {drinkTitle} var klar. Du var vigtig et andet sted. | Expired {expiresAt}. The {drinkTitle} was ready. You were important somewhere else. | Gick ut {expiresAt}. {drinkTitle} var klar. Du var viktig någon annanstans. |
-| 9 | Invitation (#19) | {hostName} vil have dig ud i solen kl. {time} ved {placeName}. Svar ja, nej eller måske. Et måske tæller som måske, hvor tyndt det end lyder. | {hostName} wants you in the sun at {time} at {placeName}. Reply yes, no or maybe. A maybe counts as a maybe, however thin it sounds. | {hostName} vill ha ut dig i solen kl. {time} vid {placeName}. Svara ja, nej eller kanske. Ett kanske räknas som kanske, hur tunt det än låter. |
-| 10 | Aflysning (#22) | Aflyst. Invitationen er opdateret, og alle ser det næste gang de åbner den. Ingen behøver finde på en forkølelse. | Cancelled. The invitation is updated, and everyone sees it next time they open it. Nobody has to invent a cold. | Inställt. Inbjudan är uppdaterad och alla ser det nästa gång de öppnar den. Ingen behöver hitta på en förkylning. |
-
-## 7. Leveringsrækkefølge og acceptkriterier
-
-### Rækkefølge
-
-Punkt 1–6 er implementeret. Listen bevarer den besluttede leveringsrækkefølge; punkt 7 er den senere illustrationspakke.
-
-Ingen deployment, merge eller notifikationer indgår. Push om kommende sol (drøftet, ikke et bekræftet Jurnie-krav) og "foreslå anden tid" på invitation (#20) er senere arbejde og kræver funktioner der ikke findes.
-
-1. Fire valgfunktioner og opslagstabeller med én tabeltest pr. nøgle. Eksisterende udklip bruges midlertidigt.
-2. Startpakken tegnes og integreres med de godkendte identiteter.
-3. Sprogordbog DA/EN/SV for alle nøgler, vælger, lagring, Intl-format og delingstekster. Blandet svensk/dansk fjernes.
-4. Hero og tomme tilstande (#1–14) med S3, S4, S5 og dekorative vejrlag.
-5. Tilbudskort og kupon (#23–32) med S1 og S2. Det lokale demo-partnerflow og eksemplets separate, ugyldige prøvekupon bevares.
-6. Invitation (#18–22).
-7. Senere pakke efter første brugertest.
-
-### Acceptkriterier
-
-| Krav | Kriterium | Måling |
-|---|---|---|
-| J2 | Typer lægges sammen | Test: park og bar aktive, sted med kun park vises. Alle typer fra giver tomt udvalg og tekst #11. Ingen automatisk "alle". |
-| U2 | Vejrtilstand cloud giver blue-shirt uanset bygningssol | Test: alle steder bygningssol=sun og vejrtilstand cloud giver blue-shirt. 0 afvigelser. |
-| U2, J1 | football kun med alle fire betingelser: available og ikke stale, vejrtilstand sun, solhøjde over horisont, ≥1 sted bygningssol=sun | 4 tests, én pr. manglende betingelse. 0 fejl. |
-| Datastatus | Unknown, missing og stale giver aldrig blue-shirt eller football | 3 tests. 0 fejl. |
-| Nat | Solhøjde under horisont og `available=false` giver turtleneck og synlig datastatus-linje | 1 test. |
-| U3 | `offer.kind` beer giver puffer, cocktail giver blue-coat, andet giver ingen figur | Fixture-test på alle demo- og partnertilbud. 0 afvigelser. |
-| Kupon | Kuponkort uændret når hero skifter | Snapshot: samme kupon ved alle hero-tilstande giver identiske kupondata. |
-| Afvisning | Afvist claim viser serverens grund | Test: hver kendt grundkode giver sin tekst. Ukendt kode giver "Serveren sagde nej." |
-| Determinisme | Rene funktioner, én tabeltest pr. nøgle | Matrixens vejr-, tom-, tilbuds-, kupon- og invitationstilstande kontrolleres med tabeltests og browserflows. Samme eksplicitte input giver samme valg; aktuel tid leveres som input hvor den behøves. |
-| Invitation | Aflysning opdaterer invitationen og sender intet | Test: aflys, modtager genindlæser, ser #22. 0 send-kald. |
-| RSVP | Tre tal svarer til listen | Test: 2 ja, 1 måske, 1 nej giver "2 ja. 1 måske. 1 nej." Måske tæller aldrig som nej. |
-| Demo | Lokal demo beholder testclaim og demokupon; simuleret eksempel beholder lokal prøveknap uden rigtigt claim | 2 tests, to forskellige mærker. |
-| U4 | Sprogvalg overlever reload og gælder alle sider | E2E: vælg SV, reload, alle appens egne labels, fejl og hjælpetekster følger SV på forside, resultater, sted, tilbud, kupon og invitation. Egennavne, brugernes tekst og partnerens produktnavne bevares. Lint: 0 manglende nøgler i tre sprog. |
-| U4 | Tider og beløb via Intl | Samme faktiske klokkeslæt i alle tre sprog, med lokal formattering. Beløb via Intl med valuta DKK. EN- og SV-output indeholder "DKK". DA-output indeholder "kr.". Ingen test af tegnrækkefølge. |
-| A | Hver figur i tilstandsflade har nøgle | 0 figurer uden nøgle uden for galleri og kategorimarkører. |
-| Mobil | Hero, hovedknap og første resultat uden scroll | 360×640, alle 9 hero-tilstande. |
-| U6 | Nye varianter består identitetstjekket | `scripts/verify-visual-identity.mjs` grønt på startpakken. |
-| J8 | Standard skjuler shade/unknown og ubekræftet åbent | Test: default-filtre giver 0 af dem i udvalget. |
+Animationsplanen er en plan, ikke en implementeret bevægelsesleverance. Senere illustrationsvarianter (tomme glas, skålende positurer, tommel op, aflysningsskilt og ekstra pege-/skuldertræk) kræver fortsat en konkret bestilling. Flere byer, nye drikketyper, push om kommende sol og forslag til alternativ invitationstid er ikke del af den aktuelle app.
