@@ -2,8 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { LanguageSwitcher, useLanguage } from "./Language.jsx";
 
 export default function Modal({ title, children, onClose, className = "" }) {
+  const { t } = useLanguage();
   const ref = useRef(null);
   useEffect(() => {
     const d = ref.current;
@@ -27,10 +29,11 @@ export default function Modal({ title, children, onClose, className = "" }) {
     >
       <div className="modal-top">
         <h2>{title}</h2>
+        <LanguageSwitcher />
         <button
           type="button"
           className="icon-button"
-          aria-label="Stäng"
+          aria-label={t("common.close")}
           onClick={onClose}
         >
           <X size={21} />

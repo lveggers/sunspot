@@ -4,6 +4,7 @@ import { mapColors } from "./theme.js";
 import { Plus, Minus, LocateFixed, Layers, Info } from "lucide-react";
 import { groupMapMarkers } from "./mapMarkers.js";
 import { atHour } from "./lib.js";
+import { useLanguage } from "./Language.jsx";
 
 import * as SunCalc from "suncalc";
 import BuildingShadowLayer from "./BuildingShadowLayer.js";
@@ -32,6 +33,7 @@ export default function MapView({
   seatError,
   children,
 }) {
+  const { language, t, errorText } = useLanguage();
   const touchgrass =
     focusResults &&
     categories.length === 1 &&
@@ -96,6 +98,7 @@ export default function MapView({
             {
               project: (p) => m.project([p.lat, p.lng], zoom),
               zoom,
+              language,
               selectedId: selected?.id,
               bounds: {
                 south: bounds.getSouth(),
@@ -149,15 +152,15 @@ export default function MapView({
           registry.set(p.markerId, record);
         }
         record.item = p;
-        const signature = `${p.name}|${p.emoji}|${active}|${compact}|${results[p.id]?.state}|${p.members?.length}`;
+        const signature = `${language}|${p.name}|${p.emoji}|${active}|${compact}|${results[p.id]?.state}|${p.members?.length}`;
         if (signature !== record.signature) {
           record.button.className = `place-pin ${p.members ? "cluster-pin" : ""} ${active ? "active" : ""} ${results[p.id]?.state === "sun" ? "sunny" : ""} ${compact && !p.members ? "compact" : ""}`;
           record.button.setAttribute(
             "aria-label",
-            p.members ? `Zooma in: ${p.name}` : `Visa ${p.name}`,
+            t(p.members ? "map.groupZoom" : "map.showPlace", { name: p.name }),
           );
           record.button.title = p.members
-            ? `${p.name} · tryck för att zooma`
+            ? t("map.groupHint", { name: p.name })
             : p.name;
           record.button.dataset.id = p.id;
           record.emoji.textContent = p.emoji;
@@ -174,7 +177,7 @@ export default function MapView({
     update();
     m.on("moveend zoomend resize", update);
     return () => m.off("moveend zoomend resize", update);
-  }, [places, selected, results, onSelect, editing, pending]);
+  }, [places, selected, results, onSelect, editing, pending, language, t]);
   useEffect(() => {
     if (selected?.greenSpace && touchgrass && map.current) {
       fitParkView(map.current, places, selected.id);
@@ -201,10 +204,12 @@ export default function MapView({
         fillColor: colors.blue,
         fillOpacity: 1,
       })
-        .bindTooltip("Beräkningspunkt / din sittplats")
+        .bindTooltip(t("map.seatTooltip"))
         .addTo(seatLayer.current);
     }
-    if (!editing) return;
+  }, [point, touchgrass, t]);
+  useEffect(() => {
+    if (!map.current || !editing) return;
     const m = map.current;
     container.current.scrollIntoView({ block: "center", behavior: "smooth" });
     m.setView(point ? [point[1], point[0]] : [selected.lat, selected.lng], 18);
@@ -271,12 +276,12 @@ export default function MapView({
     <section
       className={`map-shell ${editing ? "editing" : ""} ${touchgrass ? "touchgrass" : ""} ${venueFocus ? "venue-focus" : ""}`}
       data-categories={categories.join(" ")}
-      aria-label="Karta över platser i Köpenhamn"
+      aria-label={t("map.region")}
     >
       <div ref={container} className="map" />
       <button
         className="map-tools-toggle"
-        aria-label="Kartverktyg"
+        aria-label={t("map.tools")}
         aria-expanded={toolsOpen}
         onClick={() => setToolsOpen((v) => !v)}
       >
@@ -284,10 +289,10 @@ export default function MapView({
       </button>
       <div className={`map-tools ${toolsOpen ? "is-open" : ""}`}>
         <div className="map-controls">
-          <button onClick={() => map.current?.zoomIn()} aria-label="Zooma in">
+          <button onClick={() => map.current?.zoomIn()} aria-label={t("map.zoomIn")}>
             <Plus size={19} />
           </button>
-          <button onClick={() => map.current?.zoomOut()} aria-label="Zooma ut">
+          <button onClick={() => map.current?.zoomOut()} aria-label={t("map.zoomOut")}>
             <Minus size={19} />
           </button>
           <button
@@ -296,7 +301,7 @@ export default function MapView({
                 ? map.current && fitParkView(map.current, places)
                 : map.current && fitPlacesView(map.current, places)
             }
-            aria-label="Visa hela området"
+            aria-label={t("map.showArea")}
           >
             <LocateFixed size={19} />
           </button>
@@ -305,13 +310,13 @@ export default function MapView({
           <button
             className={zones ? "on" : ""}
             onClick={() => setZones(!zones)}
-            aria-label="Byggnadsskuggor"
+            aria-label={t("map.buildingShadows")}
             aria-pressed={zones}
           >
-            <Layers size={17} /> Skuggor
+            <Layers size={17} /> {t("map.shadows")}
           </button>
           <button
-            aria-label="Om kartan"
+            aria-label={t("map.about")}
             aria-expanded={legendOpen}
             onClick={() => setLegendOpen((open) => !open)}
           >
@@ -323,44 +328,43 @@ export default function MapView({
         <div className="zone-note shadow-legend" role="status">
           {dataError ? (
             <>
-              <strong>Skuggdata kunde inte laddas.</strong>
-              <button onClick={onRetry}>Försök igen</button>
+              <strong>{t("map.dataFailed")}</strong>
+              <button onClick={onRetry}>{t("common.retry")}</button>
             </>
           ) : !buildings ? (
-            <strong>Laddar byggnader…</strong>
+            <strong>{t("map.buildingsLoading")}</strong>
           ) : (
             <>
               <strong>
                 <i className="shadow-swatch" />
                 {altitude <= 0
-                  ? "Solen är under horisonten"
+                  ? t("map.sunBelow")
                   : altitude < 5
-                    ? "Solen är för låg för skuggmodellen"
-                    : "Mörkt = beräknad byggnadsskugga"}
+                    ? t("map.sunLow")
+                    : t("map.darkMeansShadow")}
               </strong>
               {touchgrass && (
                 <span>
                   <i className="park-swatch" />
-                  Grönt = markerad parkyta
+                  {t("map.greenMeansPark")}
                 </span>
               )}
-              <span>Höjder delvis uppskattade · träd ingår inte</span>
+              <span>{t("map.heightsNote")}</span>
               {altitude > 0 && (
                 <span>
                   <i className="coverage-swatch" />
-                  Streckat = utanför modellens täckning
+                  {t("map.outsideCoverage")}
                 </span>
               )}
-              <span>Ändra dag och tid för att följa skuggorna.</span>
+              <span>{t("map.changeTime")}</span>
             </>
           )}
         </div>
       )}
       {editing && (
         <div className="seat-prompt" role="status">
-          Tryck på din sittplats utomhus, nära stället. Blå punkt används i
-          beräkningen.
-          {seatError && <p>{seatError}</p>}
+          {t("map.chooseSeat")}
+          {seatError && <p>{errorText(seatError)}</p>}
           <div>
             <button
               onClick={() => {
@@ -368,15 +372,15 @@ export default function MapView({
                 onPointChange([p.lng, p.lat]);
               }}
             >
-              Använd kartans mittpunkt
+              {t("map.useCentre")}
             </button>
-            <button onClick={onCancelEdit}>Avbryt punktval</button>
+            <button onClick={onCancelEdit}>{t("map.cancelPoint")}</button>
           </div>
         </div>
       )}
       {tileError && (
         <div className="map-error" role="status">
-          Kartbilder kunde inte laddas. Platserna finns i listan.
+          {t("map.tilesFailed")}
         </div>
       )}
       {children}

@@ -19,9 +19,11 @@ import Modal from "./Modal.jsx";
 import { api, clock, save, saved } from "./lib.js";
 import { places } from "./places.js";
 import { getDirectionsUrl } from "./spotSearch.js";
+import { useLanguage, LanguageSwitcher } from "./Language.jsx";
+import { localeFor } from "./i18n.js";
 
-const money = (value) =>
-  new Intl.NumberFormat("da-DK", {
+const money = (value, language) =>
+  new Intl.NumberFormat(localeFor(language), {
     style: "currency",
     currency: "DKK",
     maximumFractionDigits: 2,
@@ -51,19 +53,20 @@ export function GoldenHourArt({ kind = "sun", className = "" }) {
 }
 
 function PublicShare({ offer }) {
+  const { t } = useLanguage();
   const [status, setStatus] = useState("");
   const [fallback, setFallback] = useState(false);
   const url = publicOfferUrl(offer.id || offer.offerId);
   async function share() {
     const data = {
-      title: `Golden hour · ${offer.placeName}`,
-      text: `${offer.title} på ${offer.placeName}. Ska vi ses i solen?`,
+      title: t("flows.share.title", { place: offer.placeName }),
+      text: t("flows.share.text", { title: offer.title, place: offer.placeName }),
       url,
     };
     if (navigator.share) {
       try {
         await navigator.share(data);
-        setStatus("Delat.");
+        setStatus("flows.share.shared");
         return;
       } catch (error) {
         if (error.name === "AbortError") return;
@@ -71,24 +74,24 @@ function PublicShare({ offer }) {
     }
     try {
       await navigator.clipboard.writeText(url);
-      setStatus("Länken till erbjudandet är kopierad.");
+      setStatus("flows.share.copied");
     } catch {
       setFallback(true);
-      setStatus("Kopiera länken i fältet nedan.");
+      setStatus("flows.share.copyManually");
     }
   }
   return (
     <div className="golden-share">
       <button type="button" className="golden-text-button" onClick={share}>
         <Share2 size={16} />
-        Dela erbjudandet med vänner
+        {t("flows.share.button")}
       </button>
-      {status && <p role="status">{status}</p>}
+      {status && <p role="status">{t(status)}</p>}
       {fallback && (
         <label className="golden-copy-label">
-          Länk till erbjudandet
+          {t("flows.share.link")}
           <input
-            aria-label="Länk till erbjudandet"
+            aria-label={t("flows.share.link")}
             readOnly
             value={url}
             onFocus={(event) => event.target.select()}
@@ -119,6 +122,7 @@ function VoucherClock({ expiresAt, serverNow, children }) {
 }
 
 function VoucherCard({ voucher, serverNow }) {
+  const { language, t } = useLanguage();
   return (
     <VoucherClock
       key={`${voucher.id}:${serverNow}`}
@@ -134,47 +138,47 @@ function VoucherCard({ voucher, serverNow }) {
           >
             <div className="golden-voucher-heading">
               <Ticket size={22} />
-              <span>DIN GOLDEN HOUR</span>
+              <span>{t("flows.voucher.heading")}</span>
             </div>
             {voucher.demo && (
-              <p className="golden-demo">
-                LOKAL DEMOKUPONG · INGET VERKLIGT ERBJUDANDE
-              </p>
+              <p className="golden-demo">{t("flows.voucher.demo")}</p>
             )}
-            <div className="golden-voucher-stage">
+            <div className="golden-voucher-summary">
+              <div>
+                <h3>{voucher.title}</h3>
+                <p>{voucher.placeName} · {money(voucher.priceDkk, language)}</p>
+              </div>
               <Character character={offerCharacter(voucher.kind)} />
-              <GoldenHourArt kind={voucher.kind} />
             </div>
-            <h3>{voucher.title}</h3>
-            <p>
-              {voucher.placeName} · {money(voucher.priceDkk)}
-            </p>
-            <div
-              className="golden-countdown"
-              role="timer"
-              aria-label="Tid kvar på kupongen"
-            >
-              {used ? "Inlöst" : expired ? "Tiden har gått ut" : label}
+            <div className="golden-voucher-proof">
+              <div
+                className="golden-countdown"
+                role="timer"
+                aria-label={t("flows.voucher.timer")}
+              >
+                {used ? t("flows.voucher.redeemed") : expired ? t("flows.voucher.expired") : label}
+              </div>
+              <label className="golden-voucher-code">
+                {t("flows.voucher.code")}
+                <textarea
+                  aria-label={t("flows.voucher.code")}
+                  readOnly
+                  rows={2}
+                  spellCheck={false}
+                  value={voucher.id}
+                  onFocus={(event) => event.target.select()}
+                />
+              </label>
             </div>
             <p>
               {used
-                ? "Personalen har redan löst in den här kupongen."
+                ? t("flows.voucher.usedHelp")
                 : expired
-                  ? "Kupongen har gått ut och kan inte användas igen."
-                  : "Visa kupongen på mobilen för personalen. Gäller en gång, en timme från hämtning."}
+                  ? t("flows.voucher.expiredHelp")
+                  : t("flows.voucher.showHelp")}
             </p>
-            <label className="golden-voucher-code">
-              Kupongkod
-              <input
-                aria-label="Kupongkod"
-                readOnly
-                value={voucher.id}
-                onFocus={(event) => event.target.select()}
-              />
-            </label>
             <small>
-              Giltig till {clock(new Date(voucher.expiresAt))}. Servern
-              kontrollerar giltigheten vid inlösen.
+              {t("flows.voucher.validUntil", { time: clock(new Date(voucher.expiresAt)) })}
             </small>
             <PublicShare offer={{ ...voucher, id: voucher.offerId }} />
             <Link
@@ -182,7 +186,7 @@ function VoucherCard({ voucher, serverNow }) {
               href={`/voucher/${encodeURIComponent(voucher.id)}`}
             >
               <ArrowUpRight size={16} />
-              Öppna kupongen på egen sida
+              {t("flows.voucher.open")}
             </Link>
           </div>
         );
@@ -192,6 +196,7 @@ function VoucherCard({ voucher, serverNow }) {
 }
 
 function OfferDetail({ id }) {
+  const { language, t, errorText } = useLanguage();
   const [data, setData] = useState(null);
   const [coupon, setCoupon] = useState(null);
   const [error, setError] = useState("");
@@ -212,7 +217,7 @@ function OfferDetail({ id }) {
           }
         })
         .catch((cause) => {
-          if (!request.signal.aborted) setError(cause.message);
+          if (!request.signal.aborted) setError(cause);
         });
       const voucherId = saved(`golden-voucher:${id}`);
       if (voucherId)
@@ -249,10 +254,10 @@ function OfferDetail({ id }) {
       setCoupon(value);
       if (!save(`golden-voucher:${id}`, value.voucher.id))
         setError(
-          "Spara länken till kupongen: webbläsaren kunde inte lagra den lokalt.",
+          "flows.offer.storage",
         );
     } catch (cause) {
-      setError(cause.message);
+      setError(cause);
     } finally {
       setBusy(false);
     }
@@ -263,7 +268,7 @@ function OfferDetail({ id }) {
         <VoucherCard voucher={coupon.voucher} serverNow={coupon.serverNow} />
         {error && (
           <p className="error" role="alert">
-            {error}
+            {errorText(error)}
           </p>
         )}
       </>
@@ -271,38 +276,32 @@ function OfferDetail({ id }) {
   if (!data)
     return (
       <p role={error ? "alert" : "status"}>
-        {error || "Hämtar din golden hour…"}
+        {error ? errorText(error) : t("flows.offer.loading")}
       </p>
     );
   const { offer, eligibilityReason } = data;
   const place = places.find((item) => item.id === offer.placeId);
   return (
     <div className="golden-offer-detail">
-      <div className="golden-offer-poster">
-        <Character character={offerCharacter(offer.kind)} />
-        <div className={`golden-offer-art ${offer.kind}`}>
-          <GoldenHourArt kind={offer.kind} />
-          <span className="golden-sticker">
-            {offer.kind === "beer" ? "ÖL I SOLEN" : "COCKTAIL HOUR"}
-          </span>
-        </div>
-      </div>
       {offer.demo && (
-        <p className="golden-demo">
-          LOKALT DEMOERBJUDANDE · INGET VERKLIGT TILLBUD
-        </p>
+        <p className="golden-demo">{t("flows.offer.demo")}</p>
       )}
-      <p className="golden-kicker">
-        <MapPin size={14} />
-        {offer.placeName}
-      </p>
-      <h3>{offer.title}</h3>
-      <strong className="golden-price">{money(offer.priceDkk)}</strong>
+      <div className="golden-offer-summary">
+        <div>
+          <p className="golden-kicker">
+            <MapPin size={14} />
+            {offer.placeName}
+          </p>
+          <h3>{offer.title}</h3>
+          <strong className="golden-price">{money(offer.priceDkk, language)}</strong>
+        </div>
+        <Character character={offerCharacter(offer.kind)} />
+      </div>
       <p>{offer.description}</p>
       <p className="golden-availability" role="status">
         {offer.claimable
-          ? `Aktivt nu · till ${clock(new Date(offer.activeUntil))}`
-          : eligibilityReason || "Erbjudandet är inte tillgängligt just nu."}
+          ? t("flows.offer.activeUntil", { time: clock(new Date(offer.activeUntil)) })
+          : errorText({ code: data.eligibilityCode, message: eligibilityReason || "flows.offer.unavailable", params: data.eligibilityParams })}
       </p>
       <button
         type="button"
@@ -311,16 +310,13 @@ function OfferDetail({ id }) {
         disabled={!offer.claimable || busy}
       >
         <Ticket size={18} />
-        {busy ? "Hämtar kupong…" : "Hämta min kupong · 1 timme"}
+        {busy ? t("flows.offer.claiming") : t("flows.offer.claim")}
         <ArrowUpRight size={18} />
       </button>
-      <small className="golden-terms">
-        En kupong per besökare och erbjudande. Tiden börjar vid hämtning och
-        förlängs inte om du hämtar igen.
-      </small>
+      <small className="golden-terms">{t("flows.offer.terms")}</small>
       {error && (
         <p className="error" role="alert">
-          {error}
+          {errorText(error)}
         </p>
       )}
       {place && (
@@ -331,7 +327,7 @@ function OfferDetail({ id }) {
           rel="noreferrer"
         >
           <MapPin size={15} />
-          Ta mig till {place.name}
+          {t("flows.offer.directions", { place: place.name })}
         </a>
       )}
       <PublicShare offer={offer} />
@@ -340,6 +336,7 @@ function OfferDetail({ id }) {
 }
 
 export function GoldenHourDiscovery({ compact = false }) {
+  const { language, t, errorText } = useLanguage();
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -363,7 +360,7 @@ export function GoldenHourDiscovery({ compact = false }) {
         .catch((cause) => {
           if (!request.signal.aborted) {
             setOffers([]);
-            setError(cause.message);
+            setError(cause);
           }
         })
         .finally(() => {
@@ -392,7 +389,7 @@ export function GoldenHourDiscovery({ compact = false }) {
   return (
     <section
       className={`golden-discovery ${compact ? "is-compact" : ""}`}
-      aria-label="Golden hour erbjudanden"
+      aria-label={t("flows.discovery.label")}
     >
       <button
         type="button"
@@ -401,22 +398,24 @@ export function GoldenHourDiscovery({ compact = false }) {
       >
         <Character character="puffer" />
         <span>
-          <strong>Golden hour, någon?</strong>
+          <strong>{t("flows.discovery.heading")}</strong>
           <small>
             {loading
-              ? "Letar efter soliga erbjudanden…"
+              ? t("flows.discovery.loading")
               : error
-                ? "Erbjudanden kunde inte hämtas"
+                ? t("flows.discovery.failed")
                 : offers.length
-                  ? `${offers.length} soliga erbjudanden just nu`
-                  : "Inga aktiva erbjudanden just nu"}
+                  ? offers.length === 1
+                    ? t("flows.discovery.one")
+                    : t("flows.discovery.count", { count: offers.length })
+                  : t("flows.discovery.none")}
           </small>
         </span>
         <ArrowUpRight size={21} />
       </button>
       {open && (
         <Modal
-          title={activeId ? "Din golden hour" : "Golden hour just nu"}
+          title={activeId ? t("flows.discovery.detail") : t("flows.discovery.now")}
           onClose={close}
           className="golden-modal"
         >
@@ -428,42 +427,30 @@ export function GoldenHourDiscovery({ compact = false }) {
                 onClick={() => setActiveId(null)}
               >
                 <ArrowLeft size={15} />
-                Alla erbjudanden
+                {t("flows.discovery.all")}
               </button>
               <OfferDetail key={activeId} id={activeId} />
             </>
           ) : (
             <>
               <div className="golden-list-intro">
-                <div className="golden-list-cast">
-                  <Character character="football" />
-                  <Character character="blue-coat" />
-                </div>
                 <div>
-                  <p className="golden-kicker">EN GOD UNDSKYLDNING.</p>
-                  <h3>
-                    Skal vi tage
-                    <br />
-                    én mere?
-                  </h3>
+                  <p className="golden-kicker">{t("flows.discovery.kicker")}</p>
+                  <h3>{t("flows.discovery.questionTop")}<br />
+                    {t("flows.discovery.questionBottom")}</h3>
                 </div>
+                <Character character="football" />
               </div>
-              <p className="golden-list-copy">
-                Tillfälliga erbjudanden från platser med sol och öppet just nu.
-                Hämta en kupong, gå dit och visa den för personalen.
-              </p>
+              <p className="golden-list-copy">{t("flows.discovery.help")}</p>
               {loading ? (
-                <p role="status">Hämtar erbjudanden…</p>
+                <p role="status">{t("flows.discovery.fetching")}</p>
               ) : error ? (
-                <p role="alert">{error}</p>
+                <p role="alert">{errorText(error)}</p>
               ) : !offers.length ? (
                 <div className="golden-empty">
                   <Sun size={25} />
-                  <h3>Vi väntar på nästa golden hour.</h3>
-                  <p>
-                    Erbjudanden syns när en partner har aktiverat dem och
-                    platsen är öppen, med sol och en aktuell väderprognos.
-                  </p>
+                  <h3>{t("flows.discovery.wait")}</h3>
+                  <p>{t("flows.discovery.waitHelp")}</p>
                 </div>
               ) : (
                 <div className="golden-offer-list">
@@ -478,10 +465,10 @@ export function GoldenHourDiscovery({ compact = false }) {
                       <span>
                         <small>
                           {offer.placeName}
-                          {offer.demo ? " · lokal demo" : ""}
+                          {offer.demo ? t("flows.discovery.demoSuffix") : ""}
                         </small>
                         <strong>{offer.title}</strong>
-                        <b>{money(offer.priceDkk)}</b>
+                        <b>{money(offer.priceDkk, language)}</b>
                       </span>
                       <ArrowUpRight size={19} />
                     </button>
@@ -489,11 +476,11 @@ export function GoldenHourDiscovery({ compact = false }) {
                 </div>
               )}
               <details className="prototype-offer-example">
-                <summary>Se et tydeligt demoeksempel</summary>
+                <summary>{t("flows.discovery.demoExample")}</summary>
                 <GoldenHourExample />
               </details>
               <Link href="/partner" className="golden-text-button">
-                Har du en plats i solen? Partnerportal
+                {t("flows.discovery.partner")}
                 <ArrowUpRight size={15} />
               </Link>
             </>
@@ -505,6 +492,7 @@ export function GoldenHourDiscovery({ compact = false }) {
 }
 
 export function GoldenVoucherPage({ id }) {
+  const { t, errorText } = useLanguage();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -525,7 +513,7 @@ export function GoldenVoucherPage({ id }) {
         .catch((cause) => {
           if (!request.signal.aborted) {
             setData(null);
-            setError(cause.message);
+            setError(cause);
           }
         });
     };
@@ -549,22 +537,24 @@ export function GoldenVoucherPage({ id }) {
         </span>
         SunSpot
       </Link>
+      <LanguageSwitcher />
       <div className="golden-standalone-card">
         {data ? (
           <VoucherCard voucher={data.voucher} serverNow={data.serverNow} />
         ) : (
-          <p role={error ? "alert" : "status"}>{error || "Hämtar kupongen…"}</p>
+          <p role={error ? "alert" : "status"}>{error ? errorText(error) : t("flows.voucher.loading")}</p>
         )}
       </div>
       <Link className="golden-text-button" href="/">
         <ArrowLeft size={16} />
-        Tillbaka till solen
+        {t("flows.voucher.back")}
       </Link>
     </main>
   );
 }
 
 export function PartnerPortal() {
+  const { language, t, errorText } = useLanguage();
   const [dashboard, setDashboard] = useState(null);
   const [status, setStatus] = useState("loading");
   const [revision, setRevision] = useState(0);
@@ -592,7 +582,7 @@ export function PartnerPortal() {
         if (!controller.signal.aborted) {
           setDashboard(null);
           setStatus("anonymous");
-          if (!cause.message.includes("Logga in")) setError(cause.message);
+          if (cause.status !== 401) setError(cause);
         }
       });
     return () => controller.abort();
@@ -631,7 +621,7 @@ export function PartnerPortal() {
       setRevision((value) => value + 1);
       return true;
     } catch (cause) {
-      if (request === action.current) setError(cause.message);
+      if (request === action.current) setError(cause);
       return false;
     } finally {
       if (request === action.current) setBusy(false);
@@ -639,11 +629,11 @@ export function PartnerPortal() {
   }
   async function login(event) {
     event.preventDefault();
-    await mutate("/partner/login", { email, password }, "Inloggad.");
+    await mutate("/partner/login", { email, password }, "flows.partner.loggedIn");
     setPassword("");
   }
   async function logout() {
-    if (await mutate("/partner/logout", null, "Utloggad.")) {
+    if (await mutate("/partner/logout", null, "flows.partner.loggedOut")) {
       setDashboard(null);
       setStatus("anonymous");
     }
@@ -654,7 +644,7 @@ export function PartnerPortal() {
       await mutate(
         "/partner/offers",
         { title, description, kind, priceDkk: Number(price) },
-        "Utkastet är sparat. Det är inte publikt ännu.",
+        "flows.partner.savedDraft",
       )
     ) {
       setTitle("");
@@ -668,7 +658,7 @@ export function PartnerPortal() {
       await mutate(
         `/partner/vouchers/${encodeURIComponent(redeemId.trim())}/redeem`,
         null,
-        "Kupongen är inlöst.",
+        "flows.partner.redeemed",
       )
     )
       setRedeemId("");
@@ -682,45 +672,41 @@ export function PartnerPortal() {
           </span>
           SunSpot
         </Link>
-        <span className="golden-kicker">PARTNERPORTAL</span>
+        <span className="golden-kicker">{t("flows.partner.heading")}</span>
+        <LanguageSwitcher />
         <Link href="/" className="golden-text-button">
           <ArrowLeft size={16} />
-          Till kartan
+          {t("flows.partner.map")}
         </Link>
       </header>
       <section className="partner-intro">
         <div>
-          <p className="golden-kicker">YOUR PLACE. THEIR GOLDEN HOUR.</p>
-          <h1>
-            Har du sol?
-            <br />
-            <em>Skåla med oss.</em>
+          <p className="golden-kicker">{t("flows.partner.kicker")}</p>
+          <h1>{t("flows.partner.sun")}<br />
+            <em>{t("flows.partner.cheers")}</em>
           </h1>
-          <p>
-            Skapa ett erbjudande för din plats. Aktivera det när det är öppet
-            och solen faktiskt är framme.
-          </p>
+          <p>{t("flows.partner.intro")}</p>
         </div>
         <GoldenHourArt kind="scene" />
       </section>
       {error && (
         <p className="partner-message error" role="alert">
-          {error}
+          {errorText(error)}
         </p>
       )}
       {notice && (
         <p className="partner-message" role="status">
-          {notice}
+          {t(notice)}
         </p>
       )}
       {status === "loading" ? (
-        <p role="status">Hämtar partnerportalen…</p>
+        <p role="status">{t("flows.partner.loading")}</p>
       ) : !dashboard ? (
         <section className="partner-login paper-card">
-          <h2>Välkommen tillbaka.</h2>
-          <p>Logga in till din plats och dina erbjudanden.</p>
+          <h2>{t("flows.partner.welcome")}</h2>
+          <p>{t("flows.partner.loginHelp")}</p>
           <form onSubmit={login}>
-            <label htmlFor="partner-email">E-post</label>
+            <label htmlFor="partner-email">{t("flows.partner.email")}</label>
             <input
               id="partner-email"
               type="email"
@@ -729,7 +715,7 @@ export function PartnerPortal() {
               onChange={(event) => setEmail(event.target.value)}
               required
             />
-            <label htmlFor="partner-password">Lösenord</label>
+            <label htmlFor="partner-password">{t("flows.partner.password")}</label>
             <input
               id="partner-password"
               type="password"
@@ -739,17 +725,13 @@ export function PartnerPortal() {
               required
             />
             <button className="golden-button" disabled={busy}>
-              Logga in
+              {t("flows.partner.login")}
               <ArrowUpRight size={19} />
             </button>
           </form>
           <div className="golden-demo-panel">
-            <strong>Lokal demo</strong>
-            <p>
-              Demo fungerar bara i lokal utveckling. Kontot är bundet till Café
-              Stefanshus. Alla demoutkast, erbjudanden och kuponger märks som
-              demo.
-            </p>
+            <strong>{t("flows.partner.demo")}</strong>
+            <p>{t("flows.partner.demoHelp")}</p>
             <button
               type="button"
               className="golden-text-button"
@@ -758,7 +740,7 @@ export function PartnerPortal() {
                 setPassword("sunspot-local-demo");
               }}
             >
-              Fyll i lokal demoinloggning
+              {t("flows.partner.fillDemo")}
               <ArrowUpRight size={14} />
             </button>
           </div>
@@ -767,46 +749,40 @@ export function PartnerPortal() {
         <>
           <section className="partner-place paper-card">
             <div>
-              <p className="golden-kicker">DIN PLATS</p>
+              <p className="golden-kicker">{t("flows.partner.place")}</p>
               <h2>{dashboard.partner.placeName}</h2>
               <p>
                 {dashboard.partner.email}
-                {dashboard.partner.demo ? " · lokalt demokonto" : ""}
+                {dashboard.partner.demo ? t("flows.partner.demoAccount") : ""}
               </p>
             </div>
             <button
               className="golden-text-button"
               disabled={busy}
               onClick={logout}
-            >
-              Logga ut
+            >{t("flows.partner.logout")}
             </button>
           </section>
           {dashboard.partner.demo && (
-            <p className="golden-demo partner-demo-banner">
-              LOKAL DEMO · ERBJUDANDEN OCH KUPONGER ÄR INTE VERKLIGA
-            </p>
+            <p className="golden-demo partner-demo-banner">{t("flows.partner.demoBanner")}</p>
           )}
           <div className="partner-grid">
             <section className="paper-card partner-create">
-              <h2>Duka för golden hour.</h2>
+              <h2>{t("flows.partner.createHeading")}</h2>
               <p>
-                Ett nytt erbjudande börjar som utkast och hör alltid till{" "}
-                {dashboard.partner.placeName}.
+                {t("flows.partner.draftHelp", { place: dashboard.partner.placeName })}
               </p>
               <form onSubmit={create}>
-                <label htmlFor="offer-title">Rubrik</label>
+                <label htmlFor="offer-title">{t("flows.partner.title")}</label>
                 <input
                   id="offer-title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   maxLength={80}
                   required
-                  placeholder="Till exempel: En öl i solen"
+                  placeholder={t("flows.partner.titlePlaceholder")}
                 />
-                <label htmlFor="offer-description">
-                  Beskrivning och villkor
-                </label>
+                <label htmlFor="offer-description">{t("flows.partner.description")}</label>
                 <textarea
                   id="offer-description"
                   required
@@ -814,24 +790,22 @@ export function PartnerPortal() {
                   onChange={(event) => setDescription(event.target.value)}
                   maxLength={300}
                   rows={3}
-                  placeholder="Vad ingår?"
+                  placeholder={t("flows.partner.descriptionPlaceholder")}
                 />
                 <div className="partner-field-row">
-                  <label>
-                    Dryck
-                    <select
-                      aria-label="Dryck"
+                  <label>{t("flows.partner.drink")}<select
+                      aria-label={t("flows.partner.drink")}
                       value={kind}
                       onChange={(event) => setKind(event.target.value)}
                     >
-                      <option value="beer">Öl</option>
-                      <option value="cocktail">Cocktail</option>
+                      <option value="beer">{t("flows.partner.beer")}</option>
+                      <option value="cocktail">{t("flows.partner.cocktail")}</option>
                     </select>
                   </label>
                   <label>
-                    Pris i DKK
+                    {t("flows.partner.price")}
                     <input
-                      aria-label="Pris i DKK"
+                      aria-label={t("flows.partner.price")}
                       type="number"
                       min="0.01"
                       max="1000"
@@ -843,42 +817,37 @@ export function PartnerPortal() {
                   </label>
                 </div>
                 <button className="golden-button" disabled={busy}>
-                  Spara utkast
+                  {t("flows.partner.saveDraft")}
                   <ArrowUpRight size={18} />
                 </button>
               </form>
             </section>
             <section className="paper-card partner-offers">
               <div className="partner-section-heading">
-                <h2>Dina erbjudanden</h2>
+                <h2>{t("flows.partner.offers")}</h2>
                 <GoldenHourArt kind="cocktail" />
               </div>
               <p className="partner-eligibility" role="status">
                 {dashboard.eligibility.allowed
-                  ? `Platsen kan aktivera golden hour nu · ${Math.floor(dashboard.eligibility.until)} min beräknad sol.`
-                  : dashboard.eligibility.reason ||
-                    "Ingen bekräftad sol just nu."}
+                  ? t("flows.partner.eligible", { minutes: Math.floor(dashboard.eligibility.until) })
+                  : errorText({ code: dashboard.eligibility.reasonCode, message: dashboard.eligibility.reason || "flows.partner.noSun", params: dashboard.eligibility.params })}
               </p>
-              <p className="golden-terms">
-                Ett aktiverat erbjudande är aktivt i en timme. Varje hämtad
-                kupong gäller en timme från hämtning. Servern kontrollerar
-                alltid sol, väder och öppettid.
-              </p>
+              <p className="golden-terms">{t("flows.partner.offerTerms")}</p>
               <div className="partner-offer-list">
                 {dashboard.offers.map((offer) => (
                   <article key={offer.id} className="partner-offer">
                     <span className="golden-state">
                       {offer.state === "draft"
-                        ? "UTKAST"
+                        ? t("flows.partner.draft")
                         : offer.state === "active"
-                          ? "AKTIVT"
-                          : "AVSLUTAT"}
-                      {offer.demo ? " · DEMO" : ""}
+                          ? t("flows.partner.active")
+                          : t("flows.partner.ended")}
+                      {offer.demo ? t("flows.partner.demoSuffix") : ""}
                     </span>
                     <h3>{offer.title}</h3>
                     <p>
-                      {offer.kind === "beer" ? "Öl" : "Cocktail"} ·{" "}
-                      {money(offer.priceDkk)}
+                      {offer.kind === "beer" ? t("flows.partner.beer") : t("flows.partner.cocktail")} ·{" "}
+                      {money(offer.priceDkk, language)}
                     </p>
                     {offer.state === "draft" ? (
                       <button
@@ -889,19 +858,19 @@ export function PartnerPortal() {
                           mutate(
                             `/partner/offers/${encodeURIComponent(offer.id)}/activate`,
                             null,
-                            "Erbjudandet är aktiverat i en timme.",
+                            "flows.partner.activated",
                           )
                         }
                       >
                         <Sun size={16} />
-                        Aktivera golden hour
+                        {t("flows.partner.activate")}
                       </button>
                     ) : (
                       <>
                         <p className="golden-terms">
                           {offer.state === "active"
-                            ? `Aktivt till ${clock(new Date(offer.activeUntil))}`
-                            : "Skapa ett nytt utkast för nästa golden hour."}
+                            ? t("flows.partner.activeUntil", { time: clock(new Date(offer.activeUntil)) })
+                            : t("flows.partner.nextDraft")}
                         </p>
                         <PublicShare offer={offer} />
                       </>
@@ -912,25 +881,20 @@ export function PartnerPortal() {
             </section>
           </div>
           <section className="paper-card partner-vouchers">
-            <h2>Lös in en kupong.</h2>
-            <p>
-              Kontrollera gästens kupongkod. En kod kan lösas in en gång och
-              bara på din plats.
-            </p>
+            <h2>{t("flows.partner.redeemHeading")}</h2>
+            <p>{t("flows.partner.redeemHelp")}</p>
             <form onSubmit={redeem} className="partner-redeem">
-              <label htmlFor="redeem-id" className="sr-only">
-                Kupongkod att lösa in
-              </label>
+              <label htmlFor="redeem-id" className="sr-only">{t("flows.partner.redeemCode")}</label>
               <input
                 id="redeem-id"
                 value={redeemId}
                 onChange={(event) => setRedeemId(event.target.value)}
-                placeholder="Klistra in kupongkoden"
+                placeholder={t("flows.partner.redeemPlaceholder")}
                 required
               />
               <button className="golden-button" disabled={busy}>
                 <Check size={17} />
-                Lös in
+                {t("flows.partner.redeem")}
               </button>
             </form>
             <div className="partner-voucher-list">
@@ -944,11 +908,11 @@ export function PartnerPortal() {
                       <strong>{voucher.title}</strong>
                       <small>
                         {voucher.redeemedAt
-                          ? "Inlöst"
+                          ? t("flows.voucher.redeemed")
                           : expired
-                            ? "Utgången"
-                            : `Giltig till ${clock(new Date(voucher.expiresAt))}`}
-                        {voucher.demo ? " · demo" : ""}
+                            ? t("flows.partner.voucherExpired")
+                            : t("flows.partner.validUntil", { time: clock(new Date(voucher.expiresAt)) })}
+                        {voucher.demo ? t("flows.partner.lowerDemoSuffix") : ""}
                       </small>
                       <code>{voucher.id}</code>
                     </span>
@@ -960,12 +924,10 @@ export function PartnerPortal() {
                         mutate(
                           `/partner/vouchers/${encodeURIComponent(voucher.id)}/redeem`,
                           null,
-                          "Kupongen är inlöst.",
+                          "flows.partner.redeemed",
                         )
                       }
-                    >
-                      Lös in
-                      <Check size={15} />
+                    >{t("flows.partner.redeem")}<Check size={15} />
                     </button>
                   </div>
                 );

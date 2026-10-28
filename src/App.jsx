@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Character, { categoryCharacters } from "./Character.jsx";
+import { LanguageSwitcher, useLanguage } from "./Language.jsx";
+import { localeFor } from "./i18n.js";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -31,12 +33,13 @@ import * as SunCalc from "suncalc";
 import { distanceMeters } from "./exposure.js";
 import { useSolarModel } from "./useSolarModel.js";
 import SolarWatch, { solarLabel } from "./SolarWatch.jsx";
-import { activityFor, activityNames, places } from "./places.js";
+import { activityFor, places } from "./places.js";
 import {
   api,
   atHour,
   clock,
   dayOptions,
+  dateLabel,
   localDate,
   durationLabel,
   saved,
@@ -45,6 +48,9 @@ import {
   weatherText,
   sunshineWeather,
   applySunshineWeather,
+  weatherConditionLabel,
+  openingLabel,
+  placeText,
 } from "./lib.js";
 
 import {
@@ -54,9 +60,9 @@ import {
 } from "./spotSearch.js";
 
 const categoryOptions = [
-  { id: "park", label: "Park", caption: "En bænk. Ingen hast." },
-  { id: "bar", label: "Bar", caption: "Én til i solen." },
-  { id: "restaurant", label: "Mat", caption: "Godt på tallerkenen." },
+  { id: "park", label: "finder.park", caption: "finder.parkCaption" },
+  { id: "bar", label: "finder.bar", caption: "finder.barCaption" },
+  { id: "restaurant", label: "finder.food", caption: "finder.foodCaption" },
 ];
 
 const districts = [...new Set(places.map((place) => place.district))].sort(
@@ -74,6 +80,7 @@ function WeatherIcon({ symbol = "", ...props }) {
   return <Icon {...props} />;
 }
 function PlaceCard({ place, selected, result, onSelect }) {
+  const { language, t } = useLanguage();
   return (
     <button
       className={`place-card ${selected ? "selected" : ""}`}
@@ -84,10 +91,10 @@ function PlaceCard({ place, selected, result, onSelect }) {
         <Character character={categoryCharacters[place.category]} />
         <small>
           {place.category === "park"
-            ? "UTE"
+            ? t("finder.outdoors")
             : place.category === "bar"
-              ? "BAR"
-              : "MAT"}
+              ? t("finder.barBadge")
+              : t("finder.foodBadge")}
         </small>
       </div>
       <div className="place-copy">
@@ -96,20 +103,21 @@ function PlaceCard({ place, selected, result, onSelect }) {
           <ArrowUpRight size={17} />
         </div>
         <p>
-          {place.kind} <span>·</span> {place.district}
+          {placeText(place, "kind", language)} <span>·</span> {placeText(place, "district", language)}
         </p>
         <div className={`sun-status ${result?.state === "sun" ? "" : "muted"}`}>
           <Sun size={14} />
-          {solarLabel(result)}
+          {solarLabel(result, language)}
         </div>
         <small className="opening-status">
-          {result?.opening.label || "Öppettider kontrolleras…"}
+          {openingLabel(result?.opening, language)}
         </small>
       </div>
     </button>
   );
 }
 function CreateForm({ place, date, hour, duration, onClose }) {
+  const { language, t, errorText } = useLanguage();
   const router = useRouter();
   const [meetingTime, setMeetingTime] = useState(() => {
     const start = new Date(
@@ -151,35 +159,33 @@ function CreateForm({ place, date, hour, duration, onClose }) {
         ...saved("gatherings", []),
       ]);
       if (!stored) {
-        setError(
-          "Träffen skapades men webbläsaren blockerar lagring. Tillåt lokal lagring för att kunna hantera träffen.",
-        );
+        setError("finder.storageError");
         setBusy(false);
         return;
       }
       router.push(`/invite/${created.id}`);
     } catch (e) {
-      setError(e.message);
+      setError(e);
       setBusy(false);
     }
   }
   return (
-    <Modal title="Samla dina vänner" onClose={onClose}>
+    <Modal title={t("finder.createTitle")} onClose={onClose}>
       <form className="create-form" onSubmit={submit}>
         <div className="plan-summary">
           <Character character="blue-shirt" className="plan-character" />
           <div>
             <strong>{place.name}</strong>
-            <p>{activityNames[activityFor(place.category)]}</p>
+            <p>{t(`flows.activity.${activityFor(place.category)}`)}</p>
           </div>
         </div>
         <div className="plan-time">
           <CalendarDays size={17} />
-          {meetingTime ? meetingTime.replace("T", " · ") : "Välj starttid"}
+          {meetingTime ? meetingTime.replace("T", " · ") : t("finder.chooseStart")}
           <span>·</span>
-          {durationLabel(duration)}
+          {durationLabel(duration, language)}
         </div>
-        <label htmlFor="meeting-time">Starttid för träffen</label>
+        <label htmlFor="meeting-time">{t("finder.meetingStart")}</label>
         <input
           id="meeting-time"
           type="datetime-local"
@@ -187,39 +193,38 @@ function CreateForm({ place, date, hour, duration, onClose }) {
           value={meetingTime}
           onChange={(event) => setMeetingTime(event.target.value)}
         />
-        <label htmlFor="host">Ditt namn</label>
+        <label htmlFor="host">{t("finder.yourName")}</label>
         <input
           id="host"
           required
           autoFocus
           autoComplete="given-name"
           maxLength={50}
-          placeholder="Till exempel Carl"
+          placeholder={t("finder.nameExample")}
           value={host}
           onChange={(e) => setHost(e.target.value)}
         />
         <label htmlFor="message">
-          Ett meddelande <span className="optional">(valfritt)</span>
+          {t("finder.message")} <span className="optional">{t("finder.optional")}</span>
         </label>
         <textarea
           id="message"
           rows={3}
           maxLength={300}
-          placeholder="Ska vi ses här och fånga lite sol?"
+          placeholder={t("finder.messageExample")}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
         <p className="fineprint">
-          Du får en länk med plats, tid och möjlighet att svara. Solläget är en
-          uppskattning; ingen bordsbokning görs.
+          {t("finder.invitationNote")}
         </p>
         {error && (
           <p className="error" role="alert">
-            {error}
+            {errorText(error)}
           </p>
         )}
         <button className="primary wide" disabled={busy}>
-          {busy ? "Skapar…" : "Skapa inbjudan"}
+          {busy ? t("finder.creating") : t("finder.create")}
           <ArrowUpRight size={19} />
         </button>
       </form>
@@ -228,7 +233,9 @@ function CreateForm({ place, date, hour, duration, onClose }) {
 }
 
 export default function App() {
-  const days = dayOptions();
+  const { language, t, errorText } = useLanguage();
+  const number = new Intl.NumberFormat(localeFor(language));
+  const days = dayOptions(language);
   const [date, setDate] = useState(localDate);
   const [hour, setHour] = useState(() => {
     const [h, m] = clock(new Date()).split(":").map(Number);
@@ -345,15 +352,15 @@ export default function App() {
   const result = results[selected.id];
   const pending = solar.pending || weatherLoading;
   const emptyMessage = !categories.length
-    ? "Välj minst en typ av plats."
+    ? t("finder.categoryRequired")
     : solar.error
-      ? "Skuggdata kunde inte laddas. Försök igen på kartan."
+      ? t("finder.shadowError")
       : onlySun &&
           SunCalc.getPosition(atHour(date, hour), 55.6865, 12.581).altitude <= 0
-        ? "Solen är under horisonten vid vald tid. Prova en tid före solnedgången."
+        ? t("finder.night")
         : onlySun && condition.state !== "sun"
-          ? `${condition.label}. Prova en annan tid, eller välj att visa platser utan bekräftad sol.`
-          : "Ingen plats matchar ditt område och dina filter. Prova ett annat område, en annan tid eller ändra filtren.";
+          ? t("finder.weatherEmpty", { condition: weatherConditionLabel(condition, language) })
+          : t("finder.noMatch");
 
   const selectPlace = useCallback(
     (place) => {
@@ -371,7 +378,7 @@ export default function App() {
         !isCopenhagenPoint(point) ||
         distanceMeters(point, [selected.lng, selected.lat]) > 100
       ) {
-        setSeatError("Välj en sittplats inom 100 meter från stället.");
+        setSeatError("finder.seatRange");
         return;
       }
       setSeatError("");
@@ -404,9 +411,7 @@ export default function App() {
   }
   function nearMe() {
     if (!navigator.geolocation) {
-      setLocationError(
-        "Din webbläsare kan inte hitta positionen. Välj ett område i stället.",
-      );
+      setLocationError("finder.locationUnsupported");
       return;
     }
     const request = ++locationRequest.current;
@@ -419,9 +424,7 @@ export default function App() {
         const point = [coords.longitude, coords.latitude];
         if (!isCopenhagenPoint(point)) {
           setOrigin(null);
-          setLocationError(
-            "SunSpot täcker centrala Köpenhamn just nu. Välj ett område i Köpenhamn i stället.",
-          );
+          setLocationError("finder.outsideCoverage");
           return;
         }
         setOrigin(point);
@@ -431,9 +434,7 @@ export default function App() {
         if (request !== locationRequest.current) return;
         setLocating(false);
         setOrigin(null);
-        setLocationError(
-          "Positionen kunde inte hämtas. Tillåt platsåtkomst eller välj ett område.",
-        );
+        setLocationError("finder.locationFailed");
       },
       { timeout: 10000, maximumAge: 60000 },
     );
@@ -459,26 +460,27 @@ export default function App() {
   return (
     <>
       <header className={`header ${!inviteId ? "map-header" : ""}`}>
-        <Link className="brand" href="/" aria-label="SunSpot startsida">
+        <Link className="brand" href="/" aria-label={t("finder.home")}>
           <span className="brand-icon">
             <Sun size={27} strokeWidth={2.1} />
           </span>
           SunSpot
         </Link>
-        <nav aria-label="Huvudmeny">
+        <nav aria-label={t("finder.navigation")}>
           <Link href="/" className={!inviteId ? "nav-active" : ""}>
-            Hitta sol
+            {t("finder.findSun")}
           </Link>
-          <button onClick={() => setModal("gatherings")}>
-            <Users size={16} /> Mina träffar
+          <button onClick={() => setModal("gatherings")} aria-label={t("finder.gatherings")}>
+            <Users size={16} /> <span className="header-nav-text">{t("finder.gatherings")}</span>
           </button>
           <Link href="/partner">
-            För partners <ArrowUpRight size={14} />
+            {t("finder.partners")} <ArrowUpRight size={14} />
           </Link>
         </nav>
         <div className="header-city">
-          <MapPin size={15} /> Köpenhamn<span className="city-flag">🇩🇰</span>
+          <MapPin size={15} /> {t("finder.city")}<span className="city-flag">🇩🇰</span>
         </div>
+        <LanguageSwitcher />
       </header>
       {inviteId ? (
         <Invite id={inviteId} />
@@ -490,17 +492,18 @@ export default function App() {
           >
             <aside
               className={`spot-finder ${finderOpen ? "is-expanded" : ""} ${finderExpanded ? "controls-expanded" : "controls-compact"}`}
-              aria-label="Hitta en plats i solen"
+              aria-label={t("finder.finderLabel")}
             >
               <div className="finder-brand-row">
                 <span className="finder-eyebrow">
-                  <Sun size={16} /> SUNSPOT · KØBENHAVN
+                  <Sun size={16} /> SUNSPOT · {t("finder.city").toLocaleUpperCase(localeFor(language))}
                 </span>
                 <BrandTheatre compact />
+                <div className="finder-language"><LanguageSwitcher /></div>
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label="Mina träffar"
+                  aria-label={t("finder.gatherings")}
                   onClick={() => setModal("gatherings")}
                 >
                   <Users size={18} />
@@ -508,23 +511,23 @@ export default function App() {
               </div>
               {solar.error && (
                 <div className="finder-retry" role="alert">
-                  <p>Solberäkningen saknar skuggdata.</p>
+                  <p>{t("finder.noShadowData")}</p>
                   <button type="button" onClick={solar.retry}>
-                    Ladda skuggdata igen
+                    {t("finder.retryShadowData")}
                   </button>
                 </div>
               )}
               {finderOpen ? (
                 <form onSubmit={findSpots}>
-                  <div className="golden-hero paper-hero" lang="da">
+                  <div className="golden-hero paper-hero" lang={language}>
                     <div>
-                      <span className="paper-edition">BYEN ER BEDRE UDENFOR</span>
+                      <span className="paper-edition">{t("finder.edition")}</span>
                       <h1>
-                        En plads
+                        {t("finder.headline")}
                         <br />
-                        <em>i solen.</em>
+                        <em>{t("finder.headlineSun")}</em>
                       </h1>
-                      <p className="hero-invitation">Tag dit gode selskab med.</p>
+                      <p className="hero-invitation">{t("finder.company")}</p>
                     </div>
                     <div className="hero-cast" aria-hidden="true">
                       <Character character="blue-shirt" />
@@ -541,7 +544,7 @@ export default function App() {
                       onClick={() => setFinderExpanded((value) => !value)}
                     >
                       <SlidersHorizontal size={16} />{" "}
-                      {finderExpanded ? "Luk sted og tid" : "Vælg sted og tid"}
+                      {finderExpanded ? t("finder.closeFields") : t("finder.openFields")}
                       <ChevronRight size={16} />
                     </button>
                     <button
@@ -554,25 +557,25 @@ export default function App() {
                     >
                       <LocateFixed size={14} />
                       {locating
-                        ? "Hittar dig…"
+                        ? t("finder.locating")
                         : origin
-                          ? "Inom 1,5 km från dig"
-                          : "Nära mig"}
+                          ? t("finder.nearRadius")
+                          : t("finder.near")}
                     </button>
                   </div>
                   <div className="finder-current-choice">
-                    {origin ? "Nær dig" : district || "København"}{" "}
-                    <span>·</span> {date === localDate() ? "I dag" : date}{" "}
+                    {origin ? t("finder.near") : placeText({ district }, "district", language) || t("finder.city")}{" "}
+                    <span>·</span> {date === localDate() ? t("day.today") : dateLabel(atHour(date, 12), language)}{" "}
                     <span>·</span> {clock(atHour(date, hour))}
                   </div>
                   {locationError && (
                     <p className="finder-notice" role="status">
-                      {locationError}
+                      {errorText(locationError)}
                     </p>
                   )}
                   <div id="finder-fields" className="finder-fields">
                     <div className="finder-location-label">
-                      <label htmlFor="district">Var?</label>
+                      <label htmlFor="district">{t("finder.where")}</label>
                     </div>
                     <select
                       id="district"
@@ -584,30 +587,30 @@ export default function App() {
                         setLocationError("");
                       }}
                     >
-                      <option value="">Hela Köpenhamn</option>
+                      <option value="">{t("finder.wholeCity")}</option>
                       {districts.map((value) => (
                         <option key={value} value={value}>
-                          {value}
+                          {placeText({ district: value }, "district", language)}
                         </option>
                       ))}
                     </select>
 
                     <div className="finder-time-heading">
-                      <span>När?</span>
+                      <span>{t("finder.when")}</span>
                       <button
                         type="button"
                         className={`now-button ${live ? "active" : ""}`}
                         aria-pressed={live}
                         onClick={() => setLive(true)}
                       >
-                        Nu
+                        {t("finder.now")}
                       </button>
                     </div>
                     <div className="finder-date-time">
                       <label>
-                        <span className="sr-only">Dag</span>
+                        <span className="sr-only">{t("finder.day")}</span>
                         <select
-                          aria-label="Dag"
+                          aria-label={t("finder.day")}
                           value={date}
                           onChange={(event) => {
                             setDate(event.target.value);
@@ -622,10 +625,10 @@ export default function App() {
                         </select>
                       </label>
                       <label>
-                        <span className="sr-only">Klockslag</span>
+                        <span className="sr-only">{t("finder.time")}</span>
                         <input
                           type="time"
-                          aria-label="Exakt klockslag"
+                          aria-label={t("finder.exactTime")}
                           step="60"
                           value={clock(atHour(date, hour))}
                           onChange={(event) => {
@@ -641,7 +644,7 @@ export default function App() {
                       </label>
                     </div>
                     <fieldset className="finder-types">
-                      <legend>Vad har du lust till?</legend>
+                      <legend>{t("finder.types")}</legend>
                       <div>
                         {categoryOptions.map(({ id, label, caption }) => (
                           <button
@@ -649,13 +652,13 @@ export default function App() {
                             type="button"
                             className={categories.includes(id) ? "active" : ""}
                             data-category={id}
-                            aria-label={label}
+                            aria-label={t(label)}
                             aria-pressed={categories.includes(id)}
                             onClick={() => toggleCategory(id)}
                           >
                             <Character character={categoryCharacters[id]} />
-                            <strong>{label}</strong>
-                            <small>{caption}</small>
+                            <strong>{t(label)}</strong>
+                            <small>{t(caption)}</small>
                           </button>
                         ))}
                       </div>
@@ -666,72 +669,69 @@ export default function App() {
                     disabled={pending || locating}
                   >
                     <Sun size={21} />
-                    {pending ? "Hittar solen…" : "Hitta min plats i solen"}
+                    {pending ? t("finder.searching") : t("finder.submit")}
                     <ArrowUpRight size={20} />
                   </button>
                   <GoldenHourDiscovery compact />
                   <div className="finder-secondary">
                     <span>
                       <Sun size={12} />
-                      {onlySun ? "Bara sol" : "Alla sollägen"} ·{" "}
-                      {onlyOpen ? "Bara öppet" : "Alla öppettider"}
+                      {onlySun ? t("finder.onlySun") : t("finder.allSunlight")} ·{" "}
+                      {onlyOpen ? t("finder.onlyOpen") : t("finder.allHours")}
                     </span>
                     <button
                       type="button"
                       onClick={() => setModal("filters")}
-                      aria-label="Öppna filter"
+                      aria-label={t("finder.openFilters")}
                     >
                       <SlidersHorizontal size={14} />
-                      Ändra
+                      {t("finder.change")}
                     </button>
                   </div>
                   <button
                     type="button"
                     className="finder-weather"
                     onClick={() => setModal("weather")}
-                    aria-label="Visa väderprognos"
+                    aria-label={t("finder.forecast")}
                   >
                     <WeatherIcon symbol={forecast?.symbol} size={17} />
                     <span>
                       {weatherLoading
-                        ? "Hämtar prognos…"
+                        ? t("finder.loadingForecast")
                         : forecast
-                          ? `${Math.round(forecast.temperature)}° · ${weatherText(forecast.symbol)}`
-                          : "Väderprognos saknas"}
+                          ? `${Math.round(forecast.temperature)}° · ${weatherText(forecast.symbol, language)}`
+                          : t("finder.forecastMissing")}
                     </span>
                     <ChevronRight size={14} />
                   </button>
                 </form>
               ) : (
                 <div className="finder-summary">
-                  <Character
-                    character={filtered.length ? "cyclist" : "green-jacket"}
-                    className="summary-character"
-                  />
-                  <h1>
-                    {pending
-                      ? "Söker solen…"
-                      : filtered.length
-                        ? "Din stund i solen."
-                        : "Ingen plats matchar just nu."}
-                  </h1>
-                  <p>
-                    {origin ? "Nära dig" : district || "Köpenhamn"} ·{" "}
-                    {date === localDate() ? "Idag" : date} ·{" "}
-                    {clock(atHour(date, hour))}
-                  </p>
-                  {!pending && filtered.length > 0 && (
-                    <strong>
-                      {filtered.length} match · visar {visiblePlaces.length}{" "}
-                      utvalda
-                    </strong>
-                  )}
-                  {!pending && !filtered.length && (
-                    <p className="finder-empty" role="status">
-                      {emptyMessage}
-                    </p>
-                  )}
-                  <GoldenHourDiscovery compact />
+                  <div className="finder-result-heading">
+                    <div>
+                      <h1>
+                        {pending
+                          ? t("finder.resultSearching")
+                          : filtered.length
+                            ? t("finder.resultTitle")
+                            : t("finder.noMatchTitle")}
+                      </h1>
+                      <p>
+                        {origin ? t("finder.near") : placeText({ district }, "district", language) || t("finder.city")} ·{" "}
+                        {date === localDate() ? t("day.today") : dateLabel(atHour(date, 12), language)} ·{" "}
+                        {clock(atHour(date, hour))}
+                      </p>
+                      {!pending && filtered.length > 0 && (
+                        <strong>
+                          {t("finder.matchCount", { count: filtered.length, shown: visiblePlaces.length })}
+                        </strong>
+                      )}
+                    </div>
+                    <Character
+                      character={filtered.length ? "cyclist" : "green-jacket"}
+                      className="summary-character"
+                    />
+                  </div>
                   <div className="finder-summary-actions">
                     <button
                       className="secondary"
@@ -741,11 +741,11 @@ export default function App() {
                         setDetailOpen(false);
                       }}
                     >
-                      Ändra sökning
+                      {t("finder.changeSearch")}
                     </button>
                     <button
                       className="icon-button"
-                      aria-label="Öppna filter"
+                      aria-label={t("finder.openFilters")}
                       onClick={() => setModal("filters")}
                     >
                       <SlidersHorizontal size={19} />
@@ -753,42 +753,63 @@ export default function App() {
                     {filtered.length > 0 && (
                       <button
                         className="icon-button"
-                        aria-label="Visa platslista"
+                        aria-label={t("finder.showList")}
                         onClick={() => setModal("list")}
                       >
                         <List size={19} />
                       </button>
                     )}
+                    <div className="finder-language"><LanguageSwitcher /></div>
                   </div>
+                  {!pending && !filtered.length && (
+                    <p className="finder-empty" role="status">
+                      {emptyMessage}
+                    </p>
+                  )}
+                  {visiblePlaces.length > 0 && (
+                    <section className="finder-place-preview" aria-label={t("finder.suggestions")} lang={language}>
+                      <h2>{t("finder.startHere")}</h2>
+                      {visiblePlaces.slice(0, 3).map((place) => (
+                        <PlaceCard
+                          key={place.id}
+                          place={place}
+                          selected={detailOpen && selected.id === place.id}
+                          result={results[place.id]}
+                          onSelect={selectPlace}
+                        />
+                      ))}
+                    </section>
+                  )}
+                  <GoldenHourDiscovery compact />
                   <button
                     className="finder-weather"
                     onClick={() => setModal("weather")}
-                    aria-label="Visa väderprognos"
+                    aria-label={t("finder.forecast")}
                   >
                     <WeatherIcon symbol={forecast?.symbol} size={17} />
-                    <span>{condition.label}</span>
+                    <span>{weatherConditionLabel(condition, language)}</span>
                     <ChevronRight size={14} />
                   </button>
                 </div>
               )}
             </aside>
-            <div className="map-provenance" aria-label="Datakilder på kortet">
+            <div className="map-provenance" aria-label={t("finder.dataSources")}>
               <span>
                 <i />{" "}
                 {solar.error
-                  ? "Skyggedata mangler"
+                  ? t("finder.shadowMissing")
                   : solar.pending
-                    ? "Beregner skygge"
-                    : "Beregnet bygningsskygge"}
+                    ? t("finder.shadowPending")
+                    : t("finder.shadowCalculated")}
               </span>
               <span>
                 {weatherLoading
-                  ? "Henter prognose"
+                  ? t("finder.loadingForecast")
                   : weather?.stale && forecast
-                    ? "Ældre MET-prognose"
+                    ? t("finder.forecastStale")
                     : forecast
-                      ? "Vejr: MET Norway"
-                      : "Vejrprognose mangler"}
+                      ? t("finder.forecastSource")
+                      : t("finder.forecastMissing")}
               </span>
             </div>
             <MapView
@@ -809,15 +830,15 @@ export default function App() {
                 detailOpen ? result?.point || overrides[selected.id] : null
               }
               editing={editing}
-              seatError={seatError}
+              seatError={errorText(seatError)}
               onCancelEdit={() => setEditing(false)}
               onPointChange={choosePoint}
             >
               {detailOpen && (
-                <article className="detail-card" aria-label="Vald plats">
+                <article className="detail-card" aria-label={t("finder.selectedPlace")}>
                   <button
                     className="detail-close icon-button"
-                    aria-label="Stäng plats"
+                    aria-label={t("finder.closePlace")}
                     onClick={() => {
                       setDetailOpen(false);
                       setEditing(false);
@@ -825,15 +846,14 @@ export default function App() {
                   >
                     <X size={18} />
                   </button>
-                  <div className="detail-top">
-                    <span className="detail-category">
-                      {selected.kind} <span>·</span> {selected.district}
-                    </span>
-                    <span className="demo-badge">BERÄKNAT · OSÄKERT</span>
-                  </div>
                   <div className="detail-heading">
                     <div>
-                      <p className="detail-invitation" lang="da">Her kan I mødes.</p>
+                      <div className="detail-top">
+                        <span className="detail-category">
+                          {placeText(selected, "kind", language)} <span>·</span> {placeText(selected, "district", language)}
+                        </span>
+                        <span className="demo-badge">{t("finder.estimated")}</span>
+                      </div>
                       <h2>{selected.name}</h2>
                     </div>
                     <Character character={categoryCharacters[selected.category]} />
@@ -843,32 +863,47 @@ export default function App() {
                       <Sun size={22} />
                       <span>
                         {selected.category === "park"
-                          ? "Parkens provpunkter"
-                          : "Vald utomhuspunkt"}
+                          ? t("finder.parkPoints")
+                          : t("finder.outdoorPoint")}
                         <strong>
                           {solar.pending
-                            ? "Beräknar solläge…"
-                            : solarLabel(result)}
+                            ? t("finder.sunPending")
+                            : solarLabel(result, language)}
                         </strong>
                       </span>
                     </div>
                   </div>
+                  <div className="detail-actions">
+                    <a
+                      className="primary wide directions-button"
+                      href={getDirectionsUrl(selected)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {t("finder.directions")} <Navigation size={16} />
+                    </a>
+                    <button
+                      className="secondary wide invite-friends"
+                      onClick={() => setModal("create")}
+                    >
+                      {t("finder.invite")}
+                    </button>
+                  </div>
                   <details className="place-more">
-                    <summary>Mer om platsen</summary>
-                    <p className="detail-description">{selected.description}</p>
+                    <summary>{t("finder.morePlace")}</summary>
+                    <p className="detail-description">{placeText(selected, "description", language)}</p>
                     <p className="point-note">
                       {selected.category === "park"
                         ? result?.state === "unknown"
-                          ? "Solläget är okänt när skuggdata saknas eller solen står för lågt. Trädskuggor ingår inte."
-                          : "Delvis soliga parker finns kvar i urvalet. Trädskuggor ingår inte."
+                          ? t("finder.parkUnknown")
+                          : t("finder.parkPartial")
                         : result?.pointSource === "chosen"
-                          ? "Din valda punkt visas i blått. Höjder är delvis uppskattade."
-                          : "Blå punkt är en uppskattad utomhuspunkt, inte en verifierad uteservering."}
+                          ? t("finder.chosenPoint")
+                          : t("finder.estimatedPoint")}
                     </p>
                     {result && !filtered.some((p) => p.id === selected.id) && (
                       <p className="point-note">
-                        Platsen döljs av ditt filter. Det valda kortet finns
-                        kvar så att du kan följa förändringen.
+                        {t("finder.filteredPlace")}
                       </p>
                     )}
                     {selected.category !== "park" && (
@@ -880,8 +915,8 @@ export default function App() {
                           }}
                         >
                           {editing
-                            ? "Avbryt punktval"
-                            : "Välj min sittplats på kartan"}
+                            ? t("finder.cancelPoint")
+                            : t("finder.chooseSeat")}
                         </button>
                         <button
                           disabled={
@@ -894,7 +929,7 @@ export default function App() {
                             setWatchOpen(true);
                           }}
                         >
-                          Bevaka solen här
+                          {t("finder.watchSun")}
                         </button>
                       </div>
                     )}
@@ -904,28 +939,13 @@ export default function App() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <MapPin size={14} /> Visa platskälla
+                        <MapPin size={14} /> {t("finder.placeSource")}
                       </a>
                       <span title={selected.openingHours || undefined}>
-                        {result?.opening.label || "Öppettider okända"}
+                        {openingLabel(result?.opening, language)}
                       </span>
                     </div>
                   </details>
-                  <a
-                    className="primary wide directions-button"
-                    href={getDirectionsUrl(selected)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Ta mig dit <Navigation size={18} />
-                  </a>
-                  <button
-                    className="secondary wide invite-friends"
-                    onClick={() => setModal("create")}
-                  >
-                    Ses här med vänner
-                    <ArrowUpRight size={20} />
-                  </button>
                 </article>
               )}
               {watchId && (
@@ -933,7 +953,7 @@ export default function App() {
                   className="watch-peek"
                   onClick={() => setWatchOpen((value) => !value)}
                 >
-                  {solarLabel(results[watchId])} · Visa solbevakning
+                  {solarLabel(results[watchId], language)} · {t("finder.showWatch")}
                 </button>
               )}
             </MapView>
@@ -944,7 +964,7 @@ export default function App() {
                 className="watch-minimize"
                 onClick={() => setWatchOpen(false)}
               >
-                Tillbaka till kartan <X size={14} />
+                {t("finder.backMap")} <X size={14} />
               </button>
               <SolarWatch
                 id={watchId}
@@ -960,13 +980,13 @@ export default function App() {
             </div>
           )}
           {modal === "filters" && (
-            <Modal title="Ditt urval" onClose={() => setModal(null)}>
+            <Modal title={t("finder.filterTitle")} onClose={() => setModal(null)}>
               <div className="filter-panel controls">
                 <div className="search-box">
                   <Search size={17} />
                   <input
-                    aria-label="Sök plats eller område"
-                    placeholder="Sök en plats eller ett område"
+                    aria-label={t("finder.searchLabel")}
+                    placeholder={t("finder.searchPlaceholder")}
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                   />
@@ -978,7 +998,7 @@ export default function App() {
                       checked={onlySun}
                       onChange={(event) => setOnlySun(event.target.checked)}
                     />
-                    Dölj skugga och osäkert solläge
+                    {t("finder.hideShade")}
                   </label>
                   <label>
                     <input
@@ -986,18 +1006,16 @@ export default function App() {
                       checked={onlyOpen}
                       onChange={(event) => setOnlyOpen(event.target.checked)}
                     />
-                    Bara bekräftat öppet enligt OSM
+                    {t("finder.confirmedOpen")}
                   </label>
                 </div>
                 <p className="fineprint">
-                  Solurvalet kräver byggnadssol och en aktuell prognos utan regn
-                  eller mulet väder. Okända öppettider döljs när bara öppet är
-                  valt.
+                  {t("finder.filterNote")}
                 </p>
                 <div className="duration-row">
                   <label htmlFor="duration">
                     <Clock3 size={15} />
-                    Tid på platsen
+                    {t("finder.duration")}
                   </label>
                   <select
                     id="duration"
@@ -1008,13 +1026,13 @@ export default function App() {
                   >
                     {[30, 60, 90, 120].map((value) => (
                       <option key={value} value={value}>
-                        {durationLabel(value)}
+                        {durationLabel(value, language)}
                       </option>
                     ))}
                   </select>
                 </div>
                 <button className="primary wide" onClick={() => setModal(null)}>
-                  Använd filter
+                  {t("finder.applyFilters")}
                   <ChevronRight size={18} />
                 </button>
                 <button
@@ -1024,25 +1042,25 @@ export default function App() {
                     setModal(null);
                   }}
                 >
-                  Återställ till sol och öppet nu
+                  {t("finder.reset")}
                 </button>
                 <button
                   className="text-button"
                   onClick={() => setModal("about")}
                 >
-                  Om SunSpot och datan
+                  {t("finder.aboutData")}
                 </button>
               </div>
             </Modal>
           )}
           {modal === "list" && (
-            <Modal title="Dina utvalda platser" onClose={() => setModal(null)}>
+            <Modal title={t("finder.listTitle")} onClose={() => setModal(null)}>
               <section className="results">
                 <div className="results-heading">
                   <h2>
                     {pending
-                      ? "Beräknar solläge…"
-                      : `${visiblePlaces.length} platser att upptäcka`}
+                      ? t("finder.sunPending")
+                      : t("finder.placesCount", { count: visiblePlaces.length })}
                   </h2>
                 </div>
                 <div className="place-list">
@@ -1061,14 +1079,13 @@ export default function App() {
                 </div>
                 <p className="list-note">
                   <Info size={13} />
-                  Byggnadssol och väderprognos är uppskattningar. Trädskugga
-                  ingår inte. Kontrollera öppettider hos platsen.
+                  {t("finder.listNote")}
                 </p>
               </section>
             </Modal>
           )}
           {modal === "weather" && (
-            <Modal title="Väder för vald tid" onClose={() => setModal(null)}>
+            <Modal title={t("finder.weatherTitle")} onClose={() => setModal(null)}>
               <div className="weather-card">
                 <div className="weather-top">
                   <div className="weather-icon">
@@ -1077,45 +1094,44 @@ export default function App() {
                   <div>
                     <strong>
                       {weatherLoading
-                        ? "Hämtar väder…"
+                        ? t("finder.loadingWeather")
                         : forecast
-                          ? `${Math.round(forecast.temperature)}° · ${weatherText(forecast.symbol)}`
-                          : "Väderprognos saknas"}
+                          ? `${Math.round(forecast.temperature)}° · ${weatherText(forecast.symbol, language)}`
+                          : t("finder.forecastMissing")}
                     </strong>
                     <p>
                       {forecast ? (
                         <>
                           <Wind size={12} />
                           {Math.round(forecast.wind)} m/s <span>·</span>{" "}
-                          {forecast.rain ?? "—"} mm / {forecast.hours} h
+                          {forecast.rain == null ? "—" : number.format(forecast.rain)} mm / {forecast.hours} h
                         </>
                       ) : (
-                        "För vald tid i Köpenhamn"
+                        t("finder.cityWeather")
                       )}
                     </p>
                   </div>
                 </div>
-                <p className="finder-notice">{condition.label}</p>
+                <p className="finder-notice">{weatherConditionLabel(condition, language)}</p>
                 <div className="weather-source">
                   <a
                     href="https://www.met.no/"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Väder: MET Norway
+                    {t("finder.forecastSource")}
                   </a>
                   <span>
                     {weather?.stale
-                      ? "Äldre prognos"
+                      ? t("finder.oldForecast")
                       : weather?.updatedAt
-                        ? `Uppd. ${clock(new Date(weather.updatedAt))}`
-                        : "Prognos saknas"}
+                        ? t("finder.updated", { time: clock(new Date(weather.updatedAt)) })
+                        : t("finder.forecastMissing")}
                   </span>
                 </div>
               </div>
               <p className="fineprint">
-                Solnedgång {clock(sunset)} · Köpenhamn. Prognosen gäller staden,
-                inte molnen vid en enskild stol.
+                {t("finder.sunsetNote", { time: clock(sunset) })}
               </p>
             </Modal>
           )}
@@ -1131,51 +1147,43 @@ export default function App() {
         />
       )}
       {modal === "about" && (
-        <Modal title="Om SunSpot" onClose={() => setModal(null)}>
+        <Modal title={t("finder.aboutTitle")} onClose={() => setModal(null)}>
           <div className="about-content">
             <p>
-              Hitta en plats i solen i centrala Köpenhamn och bjud in dina
-              vänner.
+              {t("finder.aboutIntro")}
             </p>
-            <h3>Sol, skuggor och väder</h3>
+            <h3>{t("finder.aboutSourcesTitle")}</h3>
             <p>
-              Byggnader, platser och öppettider kommer från{" "}
+              {t("finder.aboutSources")}
+            </p>
+            <p>
               <a
                 href="https://www.openstreetmap.org/copyright"
                 target="_blank"
                 rel="noreferrer"
               >
                 OpenStreetMap
-              </a>{" "}
-              (ODbL). Solens position beräknas med SunCalc och väderprognosen
-              hämtas från{" "}
+              </a> · {" "}
               <a href="https://www.met.no/" target="_blank" rel="noreferrer">
                 MET Norway
               </a>
-              . Solurvalet tar hänsyn till regn och moln; en prognos är ingen
-              garanti.
             </p>
             <p>
-              Byggnadshöjder är delvis uppskattade. Träd, terräng och
-              detaljerade takformer ingår inte. Barers utomhuspunkter är
-              uppskattade tills du väljer sittplats. Parker provtas över ytan.
-              Okända sollägen och öppettider räknas inte som bekräftade.
+              {t("finder.aboutLimits")}
             </p>
-            <h3>Träffar fungerar lokalt</h3>
+            <h3>{t("finder.localTitle")}</h3>
             <p>
-              Inbjudningar och gästsvar sparas. Lokala länkar fungerar på den
-              här datorn. En publik server med beständig lagring behövs för att
-              dela dem över internet.
+              {t("finder.localNote")}
             </p>
             <button className="primary wide" onClick={() => setModal(null)}>
-              Tillbaka till solen
+              {t("finder.backSun")}
               <ChevronRight size={18} />
             </button>
           </div>
         </Modal>
       )}
       {modal === "gatherings" && (
-        <Modal title="Mina träffar" onClose={() => setModal(null)}>
+        <Modal title={t("finder.gatherings")} onClose={() => setModal(null)}>
           <div className="my-gatherings">
             {saved("gatherings", []).length ? (
               saved("gatherings", []).map((gathering) => (
@@ -1188,14 +1196,14 @@ export default function App() {
             ) : (
               <div className="empty-state">
                 <Character character="green-jacket" />
-                <h3>Det börjar med en plats.</h3>
+                <h3>{t("finder.emptyGatheringsTitle")}</h3>
                 <p>
-                  Hitta ett ställe i solen och bjud in till din första träff.
+                  {t("finder.emptyGatherings")}
                 </p>
               </div>
             )}
             <p className="fineprint">
-              Här visas träffar som du skapat i den här webbläsaren.
+              {t("finder.savedGatherings")}
             </p>
           </div>
         </Modal>

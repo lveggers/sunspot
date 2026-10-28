@@ -10,11 +10,12 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { api, clock, dateLabel, durationLabel, saved, save } from "./lib.js";
-import { activityNames } from "./places.js";
+import { api, clock, dateLabel, durationLabel, saved, save, placeText } from "./lib.js";
 import Character from "./Character.jsx";
+import { useLanguage } from "./Language.jsx";
 
 export default function Invite({ id }) {
+  const { language, t, errorText } = useLanguage();
   const [g, setG] = useState(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -38,7 +39,7 @@ export default function Invite({ id }) {
           setError("");
         })
         .catch((error) => {
-          if (!signal?.aborted) setError(error.message);
+          if (!signal?.aborted) setError(error);
         }),
     [id, hostToken],
   );
@@ -62,12 +63,12 @@ export default function Invite({ id }) {
       });
       if (!save(`rsvp:${id}`, { name, answer, editToken: result.editToken }))
         throw new Error(
-          "Svaret sparades, men webbläsaren kan inte spara behörigheten att ändra det.",
+          "flows.invite.storage",
         );
       await load();
       setSent(true);
     } catch (e) {
-      setError(e.message);
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -82,7 +83,7 @@ export default function Invite({ id }) {
       });
       await load();
     } catch (e) {
-      setError(e.message);
+      setError(e);
     } finally {
       setBusy(false);
       setConfirmCancel(false);
@@ -93,30 +94,31 @@ export default function Invite({ id }) {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
     } catch {
-      setError("Kopiera länken från fältet nedan.");
+      setError("flows.invite.copyFallback");
     }
   }
   return (
     <main className="invite-page">
       <Link className="back-link" href="/">
-        <ArrowLeft size={17} /> Tillbaka till kartan
+        <ArrowLeft size={17} />
+        {t("flows.invite.back")}
       </Link>
       <div className="invite-card">
         {!g ? (
           <>
-            <h1>{error ? "Inbjudan saknas" : "Hämtar din inbjudan…"}</h1>
-            <p role="alert">{error}</p>
+            <h1>{error ? t("flows.invite.missing") : t("flows.invite.loading")}</h1>
+            <p role="alert">{errorText(error)}</p>
           </>
         ) : (
           <>
             <div className="invite-character-heading">
               <div>
                 <span className="eyebrow">
-                  {g.cancelled ? "TRÄFFEN ÄR INSTÄLLD" : "EN STUND TILLSAMMANS"}
+                  {g.cancelled ? t("flows.invite.cancelled") : t("flows.invite.kicker")}
                 </span>
-                <h1>{activityNames[g.activity]}.</h1>
+                <h1>{t(`flows.activity.${g.activity}`)}.</h1>
                 <p className="invite-intro">
-                  {g.host} bjuder in dig till <strong>{g.place.name}</strong>.
+                  {t("flows.invite.host", { host: g.host })}{" "}<strong>{g.place.name}</strong>.
                 </p>
               </div>
               <div className="invite-cast">
@@ -127,37 +129,36 @@ export default function Invite({ id }) {
             <div className="invite-facts">
               <p>
                 <CalendarDays size={19} />
-                {dateLabel(g.startsAt)}
+                {dateLabel(g.startsAt, language)}
               </p>
               <p>
                 <Clock3 size={19} />
                 {clock(new Date(g.startsAt))}–
                 {clock(new Date(Date.parse(g.startsAt) + g.duration * 60_000))}{" "}
-                · {durationLabel(g.duration)} · Köpenhamnstid
-              </p>
+                · {durationLabel(g.duration, language)}{" "}{t("flows.invite.timezone")}</p>
               <p>
                 <MapPin size={19} />
-                {g.place.meeting}
+                {placeText(g.place, "meeting", language)}
               </p>
             </div>
             {g.message && <blockquote>{g.message}</blockquote>}
             <div className="rsvp-counts">
               <span>
                 <Check size={16} />
-                {g.counts.yes} kommer
+                {t("flows.invite.yesCount", { count: g.counts.yes })}
               </span>
-              <span>{g.counts.maybe} kanske</span>
-              <span>{g.counts.no} kan inte</span>
+              <span>{t("flows.invite.maybeCount", { count: g.counts.maybe })}</span>
+              <span>{t("flows.invite.noCount", { count: g.counts.no })}</span>
             </div>
             {!g.cancelled && (
               <form onSubmit={respond} className="rsvp-form">
-                <label htmlFor="guest-name">Ditt namn</label>
+                <label htmlFor="guest-name">{t("flows.invite.name")}</label>
                 <input
                   id="guest-name"
                   autoComplete="given-name"
                   required
                   maxLength={50}
-                  placeholder="Vad heter du?"
+                  placeholder={t("flows.invite.namePlaceholder")}
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -165,12 +166,12 @@ export default function Invite({ id }) {
                   }}
                 />
                 <fieldset>
-                  <legend>Kan du komma?</legend>
+                  <legend>{t("flows.invite.question")}</legend>
                   <div className="answer-options">
                     {[
-                      ["yes", "Jag kommer", "puffer"],
-                      ["maybe", "Kanske", "green-jacket"],
-                      ["no", "Kan inte", "turtleneck"],
+                      ["yes", t("flows.invite.yes"), "puffer"],
+                      ["maybe", t("flows.invite.maybe"), "green-jacket"],
+                      ["no", t("flows.invite.no"), "turtleneck"],
                     ].map(([value, label, character]) => (
                       <label
                         className={answer === value ? "chosen" : ""}
@@ -195,23 +196,21 @@ export default function Invite({ id }) {
                   </div>
                 </fieldset>
                 <button className="primary wide" disabled={busy}>
-                  {busy ? "Sparar…" : sent ? "Svar sparat" : "Spara mitt svar"}
+                  {busy ? t("flows.invite.saving") : sent ? t("flows.invite.saved") : t("flows.invite.saveAnswer")}
                   {sent ? <Check size={18} /> : <Users size={18} />}
                 </button>
               </form>
             )}
             {sent && (
-              <p className="success" role="status">
-                Ditt svar är sparat. Du kan ändra det i den här webbläsaren.
-              </p>
+              <p className="success" role="status">{t("flows.invite.success")}</p>
             )}
             {error && (
               <p className="error" role="alert">
-                {error}
+                {errorText(error)}
               </p>
             )}
             <div className="share-section">
-              <label htmlFor="invite-url">Inbjudningslänk</label>
+              <label htmlFor="invite-url">{t("flows.invite.link")}</label>
               <div className="copy-row">
                 <input
                   id="invite-url"
@@ -219,18 +218,15 @@ export default function Invite({ id }) {
                   value={window.location.href}
                   onFocus={(e) => e.target.select()}
                 />
-                <button onClick={copy} aria-label="Kopiera inbjudningslänk">
+                <button onClick={copy} aria-label={t("flows.invite.copy")}>
                   {copied ? <Check size={18} /> : <Copy size={18} />}
                 </button>
               </div>
-              <p className="fineprint">
-                Lokal förhandsvisning: länken fungerar på den här datorn. Extern
-                delning kräver att SunSpot publiceras.
-              </p>
+              <p className="fineprint">{t("flows.invite.local")}</p>
             </div>
             {g.isHost && (
               <section className="host-section">
-                <h2>Du är värd</h2>
+                <h2>{t("flows.invite.hostHeading")}</h2>
                 {g.answers.length ? (
                   <ul>
                     {g.answers.map((r, i) => (
@@ -238,7 +234,7 @@ export default function Invite({ id }) {
                         <span>{r.name}</span>
                         <b>
                           {
-                            { yes: "Kommer", maybe: "Kanske", no: "Kan inte" }[
+                            { yes: t("flows.invite.attending"), maybe: t("flows.invite.maybe"), no: t("flows.invite.no") }[
                               r.answer
                             ]
                           }
@@ -247,24 +243,19 @@ export default function Invite({ id }) {
                     ))}
                   </ul>
                 ) : (
-                  <p>
-                    Inga svar ännu. Öppna länken i ett annat webbläsarfönster
-                    för att prova.
-                  </p>
+                  <p>{t("flows.invite.noAnswers")}</p>
                 )}
                 {!g.cancelled &&
                   (confirmCancel ? (
                     <div className="cancel-confirm">
-                      <p>Ställa in träffen för alla?</p>
+                      <p>{t("flows.invite.confirmCancel")}</p>
                       <button
                         className="danger"
                         disabled={busy}
                         onClick={cancel}
-                      >
-                        Ja, ställ in
+                      >{t("flows.invite.cancelYes")}
                       </button>
-                      <button onClick={() => setConfirmCancel(false)}>
-                        Behåll träffen
+                      <button onClick={() => setConfirmCancel(false)}>{t("flows.invite.keep")}
                       </button>
                     </div>
                   ) : (
@@ -272,15 +263,13 @@ export default function Invite({ id }) {
                       className="text-button"
                       onClick={() => setConfirmCancel(true)}
                     >
-                      <X size={15} /> Ställ in träffen
+                      <X size={15} />
+                      {t("flows.invite.cancel")}
                     </button>
                   ))}
               </section>
             )}
-            <p className="fineprint">
-              Platsens solfönster är exempeldata. Träffen är ingen
-              bordsreservation.
-            </p>
+            <p className="fineprint">{t("flows.invite.disclaimer")}</p>
           </>
         )}
       </div>

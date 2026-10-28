@@ -43,6 +43,8 @@ excluded from Git.
   five illustrated scenes, warm cream and sage surfaces, and a map-first
   mobile sheet. The scene gallery supports keyboard tabs and swipe.
   [Visual system and illustration rules](docs/visual-identity.md).
+- A remembered Danish, English or Swedish interface, including map controls,
+  partner offers, vouchers and invitations.
 - An area, day and time finder, starting at the current Copenhagen time.
   Choose a district or search within 1.5 km of your location, then find up
   to eight ranked places on a focused map, get walking directions and
@@ -99,6 +101,7 @@ npm run test:solar
 npm run test:map         # grouping, mobile layout, worker/fallback and responsiveness
 npm run test:golden-hour # offer/partner UI, sharing and server-anchored voucher states
 npm run test:identity    # artwork, scene controls, mock labels and mobile map access
+npm run test:language    # DA/EN/SV, navigation, form state and coupon timing
 ```
 
 For browser tests, install Chromium with `npx playwright install chromium`,
@@ -116,6 +119,7 @@ docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:solar
 docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:map
 docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:golden-hour
 docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:identity
+docker compose exec -e SUNSPOT_URL=http://127.0.0.1:3085 app npm run test:language
 ```
 
 Use your configured port if `SUNSPOT_PORT` differs. Browser dependencies

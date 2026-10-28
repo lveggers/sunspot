@@ -2,20 +2,22 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, X, Footprints, Sun } from "lucide-react";
 import { places } from "./places.js";
 import { recommendNext } from "./exposure.js";
-import { clock, durationLabel } from "./lib.js";
-export function solarLabel(result) {
-  if (!result) return "Solläge saknas";
-  if (!result.eligible) return "Ingen uteservering enligt OSM";
-  if (result.state === "weather-unknown") return "Väder för sol saknas";
-  if (result.state === "cloud") return "Moln eller dimma i prognosen";
-  if (result.state === "rain") return "Nederbörd i prognosen";
-  if (result.state === "unknown") return "Solläge okänt";
-  if (result.state === "shade") return "I byggnadsskugga";
+import { clock, durationLabel, openingLabel } from "./lib.js";
+import { translate } from "./i18n.js";
+import { useLanguage } from "./Language.jsx";
+export function solarLabel(result, language = "da") {
+  if (!result) return translate(language, "solar.missing");
+  if (!result.eligible) return translate(language, "solar.noOutdoor");
+  if (result.state === "weather-unknown") return translate(language, "solar.weatherUnknown");
+  if (result.state === "cloud") return translate(language, "weather.cloudFog");
+  if (result.state === "rain") return translate(language, "weather.precipitation");
+  if (result.state === "unknown") return translate(language, "solar.unknown");
+  if (result.state === "shade") return translate(language, "solar.shade");
   if (result.park)
-    return `Sol på ca ${Math.round(result.fraction * 100)} % av provpunkterna`;
+    return translate(language, "solar.parkFraction", { percent: Math.round(result.fraction * 100) });
   return result.reason === "shade"
-    ? `Skugga om ca ${result.until} min`
-    : `Minst ${durationLabel(result.until)} möjlig sol`;
+    ? translate(language, "solar.shadeSoon", { minutes: result.until })
+    : translate(language, "solar.minimumSun", { duration: durationLabel(result.until, language) });
 }
 export default function SolarWatch({
   id,
@@ -28,6 +30,7 @@ export default function SolarWatch({
   onSelect,
   onLive,
 }) {
+  const { language, t } = useLanguage();
   const [permission, setPermission] = useState(
     typeof Notification !== "undefined"
       ? Notification.permission
@@ -54,17 +57,17 @@ export default function SolarWatch({
     const key = `${id}:${result.point.join(",")}:${new Date(shadowAt).toISOString().slice(0, 16)}`;
     if (sent.current.has(key)) return;
     try {
-      new Notification(`Skugga närmar sig ${place.name}`, {
-        body: `Beräknad skugga om cirka ${result.until} minuter. Öppna SunSpot för soliga alternativ.`,
+      new Notification(t("watch.notificationTitle", { name: place.name }), {
+        body: t("watch.notificationBody", { minutes: result.until }),
         tag: `sunspot-${id}`,
       });
       sent.current.add(key);
     } catch {
       // Reflect a synchronous failure of the external Notification API.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setNoticeError("Systemnotiser stöds inte här. Varningen visas i appen.");
+      setNoticeError("watch.notificationUnsupported");
     }
-  }, [live, warning, permission, id, shadowAt, result, place]);
+  }, [live, warning, permission, id, shadowAt, result, place, t]);
   if (!place) return null;
   const recommendations =
     result && !pending
@@ -80,70 +83,60 @@ export default function SolarWatch({
     try {
       setPermission(await Notification.requestPermission());
     } catch {
-      setNoticeError("Notiser kunde inte aktiveras. Varningen visas i appen.");
+      setNoticeError("watch.notificationFailed");
     }
   }
   return (
     <section
       className={`solar-watch ${warning ? "urgent" : ""}`}
       id="sun-watch"
-      aria-label="Solbevakning"
+      aria-label={t("watch.region")}
     >
       <div className="watch-heading">
         <Bell size={18} />
         <strong>
-          {live ? "Följer din sittplats" : "Förhandsvisning vid vald tid"} ·{" "}
+          {t(live ? "watch.following" : "watch.preview")} ·{" "}
           {place.name}
         </strong>
         <button
           className="icon-button"
           onClick={onStop}
-          aria-label="Avsluta solbevakning"
+          aria-label={t("watch.stop")}
         >
           <X size={17} />
         </button>
       </div>
       <p role="status">
         {pending
-          ? "Beräknar skuggans ankomst…"
+          ? t("watch.pending")
           : warning
-            ? `Skuggan når din punkt om cirka ${result.until} minuter (${clock(new Date(shadowAt))}).`
-            : solarLabel(result)}
+            ? t("watch.warning", { minutes: result.until, time: clock(new Date(shadowAt)) })
+            : solarLabel(result, language)}
       </p>
       {result?.pointSource !== "chosen" && (
         <p>
-          Utomhuspunkten är uppskattad. Välj din sittplats på kartan före en
-          verklig bevakning.
+          {t("watch.pointUnverified")}
         </p>
       )}
       <div className="watch-actions">
-        {!live && <button onClick={onLive}>Följ klockan nu</button>}
+        {!live && <button onClick={onLive}>{t("watch.live")}</button>}
         {live && permission === "default" && (
-          <button onClick={enable}>Aktivera systemnotiser</button>
+          <button onClick={enable}>{t("watch.enableNotifications")}</button>
         )}
         <span>
-          {live
-            ? "Bevakning medan appen är öppen."
-            : "Ändra klockslaget för att prova varningen."}
+          {t(live ? "watch.whileOpen" : "watch.previewHelp")}
         </span>
       </div>
       {permission === "denied" && live && (
-        <small>Systemnotiser är blockerade. Varningen visas här i appen.</small>
+        <small>{t("watch.notificationsBlocked")}</small>
       )}
-      {noticeError && <small>{noticeError}</small>}
+      {noticeError && <small>{t(noticeError)}</small>}
       <h3>
         <Sun size={15} />
-        Nästa soliga{" "}
-        {place.category === "bar"
-          ? "bar"
-          : place.category === "restaurant"
-            ? "restaurang"
-            : "plats"}{" "}
-        i närheten
+        {t(`watch.next.${place.category}`)}
       </h3>
       <p className="watch-explainer">
-        Beräknad byggnadssol efter gångtid och under {durationLabel(duration)}.
-        Vädret kontrolleras vid vald tid; moln kan ändras. Träd ingår inte.
+        {t("watch.explainer", { duration: durationLabel(duration, language) })}
       </p>
       <div className="next-places">
         {recommendations.map(
@@ -152,13 +145,11 @@ export default function SolarWatch({
               <strong>{p.name}</strong>
               <span>
                 <Footprints size={13} />
-                ca {walk} min · {distance} m fågelvägen
+                {t("watch.walkDistance", { walk, distance })}
               </span>
               <small>
-                {opening.label} ·{" "}
-                {pointSource === "chosen"
-                  ? "vald punkt"
-                  : "sittplats ej verifierad"}
+                {openingLabel(opening, language)} ·{" "}
+                {t(pointSource === "chosen" ? "watch.chosenPoint" : "watch.unverifiedSeat")}
               </small>
             </button>
           ),
@@ -166,8 +157,7 @@ export default function SolarWatch({
       </div>
       {!pending && !recommendations.length && (
         <p>
-          Inga alternativ med tillräcklig beräknad sol hittades inom 1,5 km.
-          Prova en kortare vistelse.
+          {t("watch.noAlternatives")}
         </p>
       )}
     </section>

@@ -16,7 +16,8 @@
     "data:venues": "node scripts/build-venue-data.mjs",
     "test:map": "node scripts/verify-map-performance.mjs",
     "test:golden-hour": "node scripts/verify-golden-hour.mjs",
-    "test:identity": "node scripts/verify-visual-identity.mjs"
+    "test:identity": "node scripts/verify-visual-identity.mjs",
+    "test:language": "node scripts/verify-language.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

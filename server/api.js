@@ -21,7 +21,7 @@ const headers = {
 };
 const json = (body, status = 200, extra = {}) =>
   Response.json(body, { status, headers: { ...headers, ...extra } });
-const error = (message, status) => json({ error: message }, status);
+const error = (message, status, code = "common.error", params = {}) => json({ error: message, code, params }, status);
 
 async function readBody(request) {
   if (
@@ -30,11 +30,11 @@ async function readBody(request) {
       ?.toLowerCase()
       .startsWith("application/json")
   ) {
-    throw Object.assign(new Error("Ogiltig förfrågan."), { status: 415 });
+    throw Object.assign(new Error("Ogiltig förfrågan."), { status: 415, code: "error.invalidRequest" });
   }
   const reader = request.body?.getReader();
   if (!reader)
-    throw Object.assign(new Error("Ogiltig förfrågan."), { status: 400 });
+    throw Object.assign(new Error("Ogiltig förfrågan."), { status: 400, code: "error.invalidRequest" });
   const chunks = [];
   let size = 0;
   try {
@@ -46,6 +46,7 @@ async function readBody(request) {
         await reader.cancel();
         throw Object.assign(new Error("Förfrågan är för stor."), {
           status: 413,
+          code: "error.requestTooLarge",
         });
       }
       chunks.push(Buffer.from(value));
@@ -56,7 +57,7 @@ async function readBody(request) {
     return body;
   } catch (cause) {
     if (cause.status) throw cause;
-    throw Object.assign(new Error("Ogiltig förfrågan."), { status: 400 });
+    throw Object.assign(new Error("Ogiltig förfrågan."), { status: 400, code: "error.invalidRequest" });
   } finally {
     reader.releaseLock();
   }
@@ -70,6 +71,7 @@ export function createApi({
   getSunEligibility = async () => ({
     allowed: false,
     reason: "Sol og åbningstid kan ikke bekræftes lige nu.",
+    reasonCode: "error.sunUnconfirmed",
     until: 0,
   }),
   development = false,
@@ -107,7 +109,7 @@ export function createApi({
         requests = 0;
       }
       if (++requests > limit)
-        return json({ error: "För många försök. Vänta en minut." }, 429, {
+        return json({ error: "För många försök. Vänta en minut.", code: "error.rateLimit", params: {} }, 429, {
           "Retry-After": String(Math.ceil((windowEnd - Date.now()) / 1000)),
         });
       if (["POST", "PATCH", "DELETE"].includes(method)) {
@@ -116,16 +118,16 @@ export function createApi({
           ? origin
           : [origin || url.origin];
         if (source && !allowedOrigins.includes(source))
-          return error("Ogiltigt ursprung.", 403);
+          return error("Ogiltigt ursprung.", 403, "error.origin");
       }
       const goldenHour = await handleGoldenHour(request, path, method);
       if (goldenHour) return goldenHour;
       if (path === "/api/weather") {
-        if (method !== "GET") return error("Metoden stöds inte.", 405);
+        if (method !== "GET") return error("Metoden stöds inte.", 405, "error.method");
         return json(await getWeather());
       }
       if (path === "/api/gatherings") {
-        if (method !== "POST") return error("Metoden stöds inte.", 405);
+        if (method !== "POST") return error("Metoden stöds inte.", 405, "error.method");
         const {
           placeId,
           activity,
@@ -151,6 +153,7 @@ export function createApi({
           return error(
             "Välj en giltig aktivitet, plats och framtida tid inom sju dagar. Ange ditt namn (högst 50 tecken).",
             400,
+            "error.gatheringInvalid",
           );
         }
         const id = token(),
@@ -171,20 +174,20 @@ export function createApi({
         return json({ id, hostToken }, 201);
       }
       const match = /^\/api\/gatherings\/([A-Za-z0-9_-]+)(\/rsvp)?$/.exec(path);
-      if (!match) return error("Sidan finns inte.", 404);
+      if (!match) return error("Sidan finns inte.", 404, "error.notFound");
       const [, id, rsvp] = match;
       if (
         (rsvp && method !== "POST") ||
         (!rsvp && !["GET", "PATCH"].includes(method))
       )
-        return error("Metoden stöds inte.", 405);
+        return error("Metoden stöds inte.", 405, "error.method");
       const g = db.prepare("SELECT * FROM gatherings WHERE id = ?").get(id);
-      if (!g) return error("Inbjudan kunde inte hittas.", 404);
+      if (!g) return error("Inbjudan kunde inte hittas.", 404, "error.invitationNotFound");
       if (
         Date.now() >
         Date.parse(g.starts_at) + g.duration * 60_000 + 7 * 86400_000
       )
-        return error("Inbjudan har gått ut.", 410);
+        return error("Inbjudan har gått ut.", 410, "error.invitationExpired");
       if (method === "GET") {
         const isHost =
           hash(request.headers.get("x-host-token")) === g.host_hash;
@@ -214,10 +217,10 @@ export function createApi({
           g.cancelled ||
           Date.now() > Date.parse(g.starts_at) + g.duration * 60_000
         )
-          return error("Den här träffen tar inte längre emot svar.", 409);
+          return error("Den här träffen tar inte längre emot svar.", 409, "error.rsvpClosed");
         const { name, answer, editToken } = await readBody(request);
         if (!validText(name, 50) || !["yes", "maybe", "no"].includes(answer))
-          return error("Ange ditt namn och välj ett svar.", 400);
+          return error("Ange ditt namn och välj ett svar.", 400, "error.rsvpInvalid");
         if (editToken) {
           const row = db
             .prepare(
@@ -225,7 +228,7 @@ export function createApi({
             )
             .get(g.id, hash(editToken));
           if (!row)
-            return error("Ditt tidigare svar kunde inte verifieras.", 403);
+            return error("Ditt tidigare svar kunde inte verifieras.", 403, "error.rsvpUnverified");
           db.prepare("UPDATE rsvps SET name = ?, answer = ? WHERE id = ?").run(
             name.trim(),
             answer,
@@ -244,16 +247,17 @@ export function createApi({
         return json({ editToken: newToken }, 201);
       }
       if (hash(request.headers.get("x-host-token")) !== g.host_hash)
-        return error("Bara värden kan ställa in träffen.", 403);
+        return error("Bara värden kan ställa in träffen.", 403, "error.hostOnly");
       const body = await readBody(request);
       if (body.cancelled !== true)
-        return error("Endast inställning stöds i den här versionen.", 400);
+        return error("Endast inställning stöds i den här versionen.", 400, "error.cancelOnly");
       db.prepare("UPDATE gatherings SET cancelled = 1 WHERE id = ?").run(id);
       return json({ cancelled: true });
     } catch (cause) {
       return error(
         cause.status ? cause.message : "Något gick fel. Försök igen.",
         cause.status || 500,
+        cause.status ? cause.code : "common.error",
       );
     }
   }

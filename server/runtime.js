@@ -35,6 +35,8 @@ export function handleApi(request) {
       {
         error:
           "Träffar och Golden Hour behöver en beständig databas innan de kan användas i denna miljö.",
+        code: "error.persistentStorage",
+        params: {},
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );

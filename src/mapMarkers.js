@@ -1,8 +1,9 @@
 // Only render markers in the visible map. Stable world-grid cells keep groups
 // from jumping between buckets when the user pans.
+import { translate } from "./i18n.js";
 export function groupMapMarkers(
   items,
-  { project, bounds, zoom, selectedId, cellSize = 76 },
+  { project, bounds, zoom, selectedId, cellSize = 76, language = "da" },
 ) {
   const groups = new Map(),
     singles = [];
@@ -33,7 +34,7 @@ export function groupMapMarkers(
       id: key,
       category: members[0].category,
       members,
-      name: `${members.length} ${members[0].category === "park" ? "parker" : "ställen"}`,
+      name: translate(language, members[0].category === "park" ? "map.groupParks" : "map.groupPlaces", { count: members.length }),
       lat: members.reduce((n, p) => n + p.lat, 0) / members.length,
       lng: members.reduce((n, p) => n + p.lng, 0) / members.length,
       emoji: members[0].category === "park" ? "🌿" : members[0].emoji,

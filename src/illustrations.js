@@ -6,6 +6,7 @@ import friends from "../public/illustrations/golden-hour-friends.png";
 import cast from "../public/illustrations/sunspot-cast.png";
 import trio from "../public/illustrations/sunspot-friends-trio.png";
 import completeCast from "../public/illustrations/sunspot-complete-cast.png";
+import cutoutCast from "../public/illustrations/sunspot-cutout-cast.png";
 
 // Static imports provide content-hashed URLs, dimensions and native blur previews.
 export const illustrations = {
@@ -17,4 +18,5 @@ export const illustrations = {
   "sunspot-cast": cast,
   "sunspot-friends-trio": trio,
   "sunspot-complete-cast": completeCast,
+  "sunspot-cutout-cast": cutoutCast,
 };

@@ -1,9 +1,10 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { localeFor, translate } from "./i18n.js";
 
 export const ZONE = "Europe/Copenhagen";
 export const localDate = (date = new Date()) =>
   formatInTimeZone(date, ZONE, "yyyy-MM-dd");
-export function dayOptions() {
+export function dayOptions(language = "da") {
   const today = fromZonedTime(`${localDate()}T12:00:00`, ZONE);
   return Array.from({ length: 7 }, (_, i) => {
     const date = new Date(today.getTime() + i * 86400_000);
@@ -11,16 +12,16 @@ export function dayOptions() {
       value: localDate(date),
       label:
         i === 0
-          ? "Idag"
+          ? translate(language, "day.today")
           : i === 1
-            ? "Imorgon"
-            : new Intl.DateTimeFormat("sv-SE", {
+            ? translate(language, "day.tomorrow")
+            : new Intl.DateTimeFormat(localeFor(language), {
                 weekday: "short",
                 timeZone: ZONE,
               })
                 .format(date)
                 .replace(".", ""),
-      day: new Intl.DateTimeFormat("sv-SE", {
+      day: new Intl.DateTimeFormat(localeFor(language), {
         day: "numeric",
         month: "short",
         timeZone: ZONE,
@@ -35,17 +36,20 @@ export const atHour = (date, hour) =>
   );
 export const clock = (date) =>
   date ? formatInTimeZone(date, ZONE, "HH:mm") : "—";
-export const dateLabel = (date) =>
-  new Intl.DateTimeFormat("sv-SE", {
+export const dateLabel = (date, language = "da") =>
+  new Intl.DateTimeFormat(localeFor(language), {
     weekday: "long",
     day: "numeric",
     month: "long",
     timeZone: ZONE,
   }).format(new Date(date));
-export const durationLabel = (mins) =>
-  mins >= 60
-    ? `${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ""}`
-    : `${mins} min`;
+export function durationLabel(mins, language = "da") {
+  const number = new Intl.NumberFormat(localeFor(language), { maximumFractionDigits: 1 });
+  return translate(language, mins < 60 ? "duration.minutes" : mins % 60 ? "duration.hoursMinutes" : "duration.hours", {
+    hours: number.format(Math.floor(mins / 60)),
+    minutes: number.format(mins < 60 ? mins : mins % 60),
+  });
+}
 
 export function weatherAt(weather, date) {
   if (!weather?.available) return null;
@@ -77,17 +81,45 @@ export function weatherAt(weather, date) {
 
 export function sunshineWeather(weather, instant) {
   const forecast = weatherAt(weather, instant);
+  const condition = (state, code) => ({ state, code, label: translate("sv", code) });
   if (!forecast || weather.stale)
-    return { state: "unknown", label: "Aktuell väderprognos saknas" };
+    return condition("unknown", "weather.currentMissing");
   const symbol = forecast.symbol || "";
   if (/rain|snow|sleet|thunder/.test(symbol) || forecast.rain > 0)
-    return { state: "rain", label: "Nederbörd i prognosen" };
+    return condition("rain", "weather.precipitation");
   // Conservative cloud cutoff; use direct-sun probability if MET supplies it.
   if (symbol === "cloudy" || symbol === "fog" || forecast.cloud >= 80)
-    return { state: "cloud", label: "Moln eller dimma i prognosen" };
+    return condition("cloud", "weather.cloudFog");
   if (/^(clearsky|fair|partlycloudy)_day$/.test(symbol))
-    return { state: "sun", label: "Möjlig sol enligt prognosen" };
-  return { state: "unknown", label: "Sol kan inte bekräftas av prognosen" };
+    return condition("sun", "weather.possibleSun");
+  return condition("unknown", "weather.unconfirmedSun");
+}
+
+export function weatherConditionLabel(condition, language = "da") {
+  const code = condition?.code || ({ sun: "weather.possibleSun", cloud: "weather.cloudFog", rain: "weather.precipitation" })[condition?.state] || "weather.currentMissing";
+  return translate(language, code);
+}
+
+export function openingLabel(opening, language = "da") {
+  if (!opening) return translate(language, "opening.pending");
+  if (opening.state === "open")
+    return translate(language, opening.closesBeforeEnd ? "opening.closing" : "opening.open", { minutes: opening.remaining });
+  return translate(language, opening.state === "closed" ? "opening.closed" : "opening.unknown");
+}
+
+// OSM additions use category copy; add an ID override when curating a new place.
+const editorialPlaces = new Set(["kongens-have", "kayak-bar", "la-banchina", "orstedsparken", "brus", "host", "ofelia"]);
+const editorialKinds = new Set(["kayak-bar", "la-banchina", "orstedsparken", "brus", "ofelia"]);
+
+export function placeText(place, field, language = "da") {
+  if (!place) return "";
+  if (field === "district") return place.district === "Köpenhamn med omnejd" ? translate(language, "place.district.surroundings") : place.district;
+  if (field === "kind") return translate(language, `place.kind.${editorialKinds.has(place.id) ? place.id : place.category}`);
+  if (field === "description" || field === "meeting") {
+    const key = editorialPlaces.has(place.id) ? place.id : place.category === "park" ? "park" : "venue";
+    return translate(language, `place.${field}.${key}`);
+  }
+  return place[field] || "";
 }
 
 export function applySunshineWeather(results, condition) {
@@ -102,16 +134,16 @@ export function applySunshineWeather(results, condition) {
   );
 }
 
-export function weatherText(symbol = "") {
-  if (symbol.includes("thunder")) return "Åskrisk";
-  if (symbol.includes("rain")) return "Regn i prognosen";
+export function weatherText(symbol = "", language = "da") {
+  if (symbol.includes("thunder")) return translate(language, "weather.thunder");
+  if (symbol.includes("rain")) return translate(language, "weather.rain");
   if (symbol.includes("snow") || symbol.includes("sleet"))
-    return "Snö / snöblandat";
-  if (symbol.includes("clearsky")) return "Klart väder";
-  if (symbol.includes("fair")) return "Mestadels klart";
-  if (symbol.includes("partlycloudy")) return "Växlande molnighet";
-  if (symbol.includes("fog")) return "Dimma";
-  return "Molnigt";
+    return translate(language, "weather.snow");
+  if (symbol.includes("clearsky")) return translate(language, "weather.clear");
+  if (symbol.includes("fair")) return translate(language, "weather.fair");
+  if (symbol.includes("partlycloudy")) return translate(language, "weather.partlyCloudy");
+  if (symbol.includes("fog")) return translate(language, "weather.fog");
+  return translate(language, "weather.cloudy");
 }
 export async function api(path, options = {}) {
   const response = await fetch(`/api${path}`, {
@@ -120,7 +152,7 @@ export async function api(path, options = {}) {
   });
   const data = await response.json();
   if (!response.ok)
-    throw new Error(data.error || "Något gick fel. Försök igen.");
+    throw Object.assign(new Error(data.error || "Något gick fel. Försök igen."), { status: response.status, code: data.code, params: data.params || {} });
   return data;
 }
 export function saved(key, fallback = null) {

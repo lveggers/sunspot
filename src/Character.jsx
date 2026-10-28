@@ -20,8 +20,13 @@ export const categoryCharacters = {
   restaurant: "stripes",
 };
 
-export default function Character({ character, className = "", sizes = "600px" }) {
+// Cutout row bounds include the top row's shoes; update if that sheet is replaced.
+const cutoutRows = [0, 544, 1024, 1536];
+
+export default function Character({ character, className = "", sizes = "600px", paper = false }) {
   const index = characters.findIndex(({ id }) => id === character);
+  const column = index % 3;
+  const row = Math.floor(index / 3);
   return (
     <span
       className={`cast-character ${className}`}
@@ -30,12 +35,14 @@ export default function Character({ character, className = "", sizes = "600px" }
       aria-hidden="true"
     >
       <Image
-        src={illustrations["sunspot-complete-cast"]}
+        src={illustrations[paper ? "sunspot-complete-cast" : "sunspot-cutout-cast"]}
         alt=""
         placeholder="blur"
         sizes={sizes}
         style={{
-          transform: `translate(-${(index % 3) * (100 / 3)}%, -${Math.floor(index / 3) * (100 / 3)}%)`,
+          transform: `translate(-${column * (100 / 3)}%, -${row * (100 / 3)}%)${paper ? "" : " scale(0.88)"}`,
+          transformOrigin: `${((column + 0.5) * 100) / 3}% ${((row + 0.5) * 100) / 3}%`,
+          clipPath: paper ? undefined : `inset(${cutoutRows[row] / 1536 * 100}% ${(2 - column) * 100 / 3}% ${(1 - cutoutRows[row + 1] / 1536) * 100}% ${column * 100 / 3}%)`,
         }}
       />
     </span>

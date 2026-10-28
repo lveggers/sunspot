@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
+import sharp from "sharp";
 
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const scenes = [
@@ -18,6 +19,7 @@ const context = await browser.newContext({
   viewport: { width: 390, height: 667 },
   reducedMotion: "reduce",
 });
+await context.addCookies([{ name: "sunspot-language", value: "da", url: base }]);
 const page = await context.newPage();
 const errors = [];
 const claimRequests = [];
@@ -169,6 +171,7 @@ try {
     "sunspot-cast.png",
     "sunspot-friends-trio.png",
     "sunspot-complete-cast.png",
+    "sunspot-cutout-cast.png",
   ]) {
     const response = await context.request.get(`${base}/illustrations/${file}`);
     assert.equal(response.status(), 200, `illustration ${file} is served`);
@@ -178,9 +181,20 @@ try {
       image.length > 1024,
       `illustration ${file} has image content`,
     );
-    if (file === "sunspot-complete-cast.png") {
+    if (file === "sunspot-complete-cast.png" || file === "sunspot-cutout-cast.png") {
       assert.equal(image.readUInt32BE(16), 1024, "the PNG atlas is 1024px wide");
       assert.equal(image.readUInt32BE(20), 1536, "the PNG atlas is 1536px high");
+    }
+    if (file === "sunspot-cutout-cast.png") {
+      const alpha = await sharp(image).extractChannel("alpha").raw().toBuffer();
+      assert.ok(
+        alpha.filter((value) => value === 0).length / alpha.length >= 0.25,
+        "the cutout atlas has a substantial fully transparent background",
+      );
+      assert.ok(
+        alpha.filter((value) => value >= 250).length / alpha.length >= 0.1,
+        "the cutout atlas retains substantial opaque character artwork",
+      );
     }
   }
   await page.goto(base, { waitUntil: "domcontentloaded" });
@@ -204,7 +218,7 @@ try {
       "none",
       "decorative characters do not intercept pointer input",
     );
-    await waitForIllustration(character.locator("img"), "sunspot-complete-cast.png");
+    await waitForIllustration(character.locator("img"), "sunspot-cutout-cast.png");
   }
   await assertSearchAccessible();
   await page.setViewportSize({ width: 1366, height: 768 });
@@ -336,7 +350,7 @@ try {
     JSON.stringify({
       passed: true,
       checks: [
-        "eight illustration assets including the complete nine-character atlas",
+        "nine illustration assets including the paper and transparent character atlases",
         "three decorative hero characters and an unobstructed search button",
         "nine named characters in exact atlas cells, three desktop and two mobile columns",
         "five accessible scenes",

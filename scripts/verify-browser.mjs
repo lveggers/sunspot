@@ -12,10 +12,11 @@ const context = await browser.newContext({
   reducedMotion: "reduce",
   timezoneId: "Europe/Copenhagen",
 });
+await context.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
 const errors = [];
 const expandFinder = async (target) => {
   const toggle = target.getByRole("button", {
-    name: "Vælg sted og tid",
+    name: "Välj plats och tid",
     exact: true,
   });
   if (await toggle.isVisible()) await toggle.click();
@@ -197,6 +198,7 @@ try {
   const guestContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
   });
+  await guestContext.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
   const guest = await guestContext.newPage();
   guest.on("pageerror", (error) => errors.push(error.message));
   await guest.goto(page.url(), { waitUntil: "domcontentloaded" });
@@ -249,7 +251,39 @@ try {
   await page.screenshot({ path: "artifacts/finder-mobile.png" });
   await find();
   await expect(page.locator(".finder-summary")).toContainText("match");
-  await expect(page.getByRole("link", { name: "Ta mig dit" })).toBeInViewport();
+  for (const action of [
+    page.getByRole("link", { name: "Ta mig dit", exact: true }),
+    page.getByRole("button", { name: "Ses här med vänner", exact: true }),
+  ]) {
+    await expect(action).toBeInViewport({ ratio: 1 });
+    assert.ok(
+      await action.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2,
+        ));
+      }),
+      "mobile result actions remain unobstructed without scrolling",
+    );
+  }
+  const mapShare = await page.evaluate(() => {
+    const map = document.querySelector(".leaflet-container");
+    let exposed = 0;
+    let sampled = 0;
+    for (let y = 20; y < innerHeight - 20; y += 40) {
+      for (let x = 20; x < innerWidth - 20; x += 40) {
+        const hit = document.elementFromPoint(x, y);
+        sampled += 1;
+        if (map && hit && (hit === map || map.contains(hit))) exposed += 1;
+      }
+    }
+    return sampled ? exposed / sampled : 0;
+  });
+  assert.ok(
+    mapShare >= 0.25,
+    `mobile results leave at least 25% clickable map (${Math.round(mapShare * 100)}% exposed)`,
+  );
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -262,6 +296,7 @@ try {
     permissions: ["geolocation"],
     viewport: { width: 390, height: 844 },
   });
+  await geoContext.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
   await geoContext.route("**/api/weather", (route) =>
     route.fulfill({ json: forecast("clear") }),
   );
@@ -282,6 +317,7 @@ try {
       geolocation: position,
       permissions,
     });
+    await scenario.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
     await scenario.route("**/api/weather", (route) =>
       route.fulfill({ json: forecast("clear") }),
     );
@@ -299,6 +335,7 @@ try {
   }
 
   const delayedContext = await browser.newContext();
+  await delayedContext.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
   await delayedContext.route("**/api/weather", (route) =>
     route.fulfill({ json: forecast("clear") }),
   );
@@ -343,7 +380,7 @@ try {
         "future invitation and guest RSVP/update",
         "host cancellation",
         "cloud/rain/missing forecast",
-        "mobile layout",
+        "mobile result actions and at least 25% clickable map without scrolling",
         "nearby/coverage/permission denial",
         "no external event requests",
         "building data retry",

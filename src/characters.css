@@ -7,7 +7,6 @@
   flex-shrink: 0;
   pointer-events: none;
   user-select: none;
-  mix-blend-mode: multiply;
 }
 .cast-character > img {
   position: absolute;

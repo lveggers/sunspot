@@ -1,23 +1,29 @@
 import type { Metadata } from "next";
+import { LanguageProvider } from "../Language.jsx";
+import { translate } from "../i18n.js";
+import { requestLanguage } from "../request-language.js";
 import "leaflet/dist/leaflet.css";
 import "../styles.css";
 import "../identity.css";
 
-export const metadata: Metadata = {
-  title: "SunSpot — Sun guides your decision",
-  description:
-    "Hitta soliga parker, barer och restauranger i Köpenhamn och planera en träff med vänner.",
-  icons: { icon: "/favicon.svg" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const language = await requestLanguage();
+  return {
+    title: translate(language, "finder.metaTitle"),
+    description: translate(language, "finder.metaDescription"),
+    icons: { icon: "/favicon.svg" },
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const language = await requestLanguage();
   return (
-    <html lang="sv">
-      <body>{children}</body>
+    <html lang={language}>
+      <body><LanguageProvider initialLanguage={language}>{children}</LanguageProvider></body>
     </html>
   );
 }

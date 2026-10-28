@@ -79,7 +79,7 @@ export function createGoldenHourApi({
   const dummyHash = scryptSync(token(), dummySalt, 64);
   const respond = (body, status = 200, extra = {}) =>
     json({ ...body, serverNow: new Date().toISOString() }, status, extra);
-  const fail = (message, status) => respond({ error: message }, status);
+  const fail = (message, status, code = "common.error", params = {}) => respond({ error: message, code, params }, status);
   const cookie = (name, value, maxAge) =>
     `${name}=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${development ? "" : "; Secure"}`;
   const visitor = (request) => {
@@ -140,6 +140,8 @@ export function createGoldenHourApi({
         !allowed && checked?.allowed
           ? "Sol og åbningstid skal kontrolleres igen. Prøv en gang til."
           : checked?.reason || "Sol og åbningstid kan ikke bekræftes lige nu.",
+      reasonCode: !allowed && checked?.allowed ? "error.sunRecheck" : checked?.reasonCode || (allowed ? "eligibility.confirmed" : "error.sunUnconfirmed"),
+      params: checked?.params || {},
       until: allowed ? (checked.deadline - now) / 60000 : 0,
     };
   };
@@ -196,10 +198,10 @@ export function createGoldenHourApi({
       return null;
     const now = new Date();
     if (path === "/api/partner/login") {
-      if (method !== "POST") return fail("Metoden stöds inte.", 405);
+      if (method !== "POST") return fail("Metoden stöds inte.", 405, "error.method");
       const { email, password } = await readBody(request);
       if (!text(email, 254) || !text(password, 200))
-        return fail("Fel e-post eller lösenord.", 401);
+        return fail("Fel e-post eller lösenord.", 401, "error.credentials");
       const partner = db
         .prepare("SELECT * FROM golden_partners WHERE email = ?")
         .get(email.trim().toLowerCase());
@@ -212,7 +214,7 @@ export function createGoldenHourApi({
         ? Buffer.from(partner.password_hash, "hex")
         : dummyHash;
       if (!timingSafeEqual(candidate, expected) || !allowedDemo(partner))
-        return fail("Fel e-post eller lösenord.", 401);
+        return fail("Fel e-post eller lösenord.", 401, "error.credentials");
       const session = token();
       db.prepare("INSERT INTO golden_sessions VALUES (?, ?, ?)").run(
         hash(session),
@@ -224,7 +226,7 @@ export function createGoldenHourApi({
       });
     }
     if (path === "/api/partner/logout") {
-      if (method !== "POST") return fail("Metoden stöds inte.", 405);
+      if (method !== "POST") return fail("Metoden stöds inte.", 405, "error.method");
       const session = cookieValue(request, "sunspot_partner");
       if (session)
         db.prepare("DELETE FROM golden_sessions WHERE token_hash = ?").run(
@@ -236,9 +238,9 @@ export function createGoldenHourApi({
     }
     if (path.startsWith("/api/partner/")) {
       const partner = currentPartner(request);
-      if (!partner) return fail("Logga in som partner för att fortsätta.", 401);
+      if (!partner) return fail("Logga in som partner för att fortsätta.", 401, "error.loginRequired");
       if (path === "/api/partner/dashboard") {
-        if (method !== "GET") return fail("Metoden stöds inte.", 405);
+        if (method !== "GET") return fail("Metoden stöds inte.", 405, "error.method");
         const checked = await checkSun(partner.place_id);
         const offers = db
           .prepare(
@@ -258,7 +260,7 @@ export function createGoldenHourApi({
         });
       }
       if (path === "/api/partner/offers") {
-        if (method !== "POST") return fail("Metoden stöds inte.", 405);
+        if (method !== "POST") return fail("Metoden stöds inte.", 405, "error.method");
         const { title, description, kind, priceDkk } = await readBody(request);
         const price =
           typeof priceDkk === "number" ? Math.round(priceDkk * 100) : NaN;
@@ -274,6 +276,7 @@ export function createGoldenHourApi({
           return fail(
             "Ange titel, beskrivning, öl eller cocktail och ett pris mellan 0,01 och 1000 DKK (högst två decimaler).",
             400,
+            "error.offerInvalid",
           );
         const id = token();
         db.prepare(
@@ -293,11 +296,11 @@ export function createGoldenHourApi({
       const activation =
         /^\/api\/partner\/offers\/([A-Za-z0-9_-]+)\/activate$/.exec(path);
       if (activation) {
-        if (method !== "POST") return fail("Metoden stöds inte.", 405);
+        if (method !== "POST") return fail("Metoden stöds inte.", 405, "error.method");
         const row = db
           .prepare(`${offerQuery} WHERE o.id = ? AND o.partner_id = ?`)
           .get(activation[1], partner.id);
-        if (!row) return fail("Tilbuddet kunne ikke findes.", 404);
+        if (!row) return fail("Tilbuddet kunne ikke findes.", 404, "error.offerNotFound");
         const checked = await checkSun(row.place_id),
           eligibility = currentSun(checked);
         if (!eligibility.allowed)
@@ -305,13 +308,15 @@ export function createGoldenHourApi({
             eligibility.reason ||
               "Tilbud kan kun aktiveres, når stedet er åbent og har sol nu.",
             409,
+            eligibility.reasonCode || "error.activationUnavailable",
+            eligibility.params,
           );
         const activatedAt = new Date();
         if (
           row.active_until &&
           Date.parse(row.active_until) <= activatedAt.getTime()
         )
-          return fail("Kampagnen er afsluttet. Opret et nyt tilbud.", 409);
+          return fail("Kampagnen er afsluttet. Opret et nyt tilbud.", 409, "error.offerExpired");
         if (!row.active_until) {
           row.active_at = activatedAt.toISOString();
           row.active_until = new Date(
@@ -322,34 +327,37 @@ export function createGoldenHourApi({
           ).run(row.active_at, row.active_until, row.id, checked.deadline);
         }
         const active = db.prepare(`${offerQuery} WHERE o.id = ?`).get(row.id);
-        if (!active.active_until) return fail(currentSun(checked).reason, 409);
+        if (!active.active_until) {
+          const current = currentSun(checked);
+          return fail(current.reason, 409, current.reasonCode, current.params);
+        }
         return respond({ offer: offerView(active, checked) });
       }
       const redemption =
         /^\/api\/partner\/vouchers\/([A-Za-z0-9_-]+)\/redeem$/.exec(path);
       if (redemption) {
-        if (method !== "POST") return fail("Metoden stöds inte.", 405);
+        if (method !== "POST") return fail("Metoden stöds inte.", 405, "error.method");
         const row = db
           .prepare(`${voucherQuery} WHERE v.id = ? AND o.partner_id = ?`)
           .get(redemption[1], partner.id);
-        if (!row) return fail("Kuponen kunne ikke findes.", 404);
-        if (row.redeemed_at) return fail("Kuponen er allerede indløst.", 409);
+        if (!row) return fail("Kuponen kunne ikke findes.", 404, "error.voucherNotFound");
+        if (row.redeemed_at) return fail("Kuponen er allerede indløst.", 409, "error.voucherRedeemed");
         if (Date.parse(row.expires_at) <= now.getTime())
-          return fail("Kuponen er udløbet.", 410);
+          return fail("Kuponen er udløbet.", 410, "error.voucherExpired");
         const changed = db
           .prepare(
             "UPDATE golden_vouchers SET redeemed_at = ? WHERE id = ? AND redeemed_at IS NULL AND expires_at > ?",
           )
           .run(now.toISOString(), row.id, now.toISOString());
         if (!changed.changes)
-          return fail("Kuponen kan ikke længere indløses.", 409);
+          return fail("Kuponen kan ikke længere indløses.", 409, "error.voucherUnavailable");
         row.redeemed_at = now.toISOString();
         return respond({ voucher: voucherView(row) });
       }
-      return fail("Sidan finns inte.", 404);
+      return fail("Sidan finns inte.", 404, "error.notFound");
     }
     if (path === "/api/golden-hour/offers") {
-      if (method !== "GET") return fail("Metoden stöds inte.", 405);
+      if (method !== "GET") return fail("Metoden stöds inte.", 405, "error.method");
       const identity = visitor(request);
       const rows = db
         .prepare(
@@ -372,10 +380,10 @@ export function createGoldenHourApi({
     if (offerMatch) {
       const claiming = Boolean(offerMatch[2]);
       if (method !== (claiming ? "POST" : "GET"))
-        return fail("Metoden stöds inte.", 405);
+        return fail("Metoden stöds inte.", 405, "error.method");
       const row = db.prepare(`${offerQuery} WHERE o.id = ?`).get(offerMatch[1]);
       if (!allowedDemo(row) || !row.active_until)
-        return fail("Tilbuddet kunne ikke findes.", 404);
+        return fail("Tilbuddet kunne ikke findes.", 404, "error.offerNotFound");
       const identity = visitor(request);
       if (claiming) {
         const previous = db
@@ -402,6 +410,8 @@ export function createGoldenHourApi({
               : !eligibility.allowed
                 ? eligibility.reason
                 : "Kampagnen er afsluttet.",
+            eligibilityCode: offer.claimable ? "" : !eligibility.allowed ? eligibility.reasonCode : "error.campaignFinished",
+            eligibilityParams: !eligibility.allowed ? eligibility.params : {},
           },
           200,
           identity.headers,
@@ -410,6 +420,8 @@ export function createGoldenHourApi({
         return fail(
           !eligibility.allowed ? eligibility.reason : "Kampagnen er afsluttet.",
           409,
+          !eligibility.allowed ? eligibility.reasonCode : "error.campaignFinished",
+          eligibility.params,
         );
       const id = token(),
         claimedAt = new Date();
@@ -433,13 +445,17 @@ export function createGoldenHourApi({
       const voucher = db
         .prepare(`${voucherQuery} WHERE v.offer_id = ? AND v.visitor_hash = ?`)
         .get(row.id, identity.hash);
-      if (!voucher)
+      if (!voucher) {
+        const current = currentSun(checked);
         return fail(
-          currentSun(checked).allowed
+          current.allowed
             ? "Kampagnen er afsluttet."
-            : currentSun(checked).reason,
+            : current.reason,
           409,
+          current.allowed ? "error.campaignFinished" : current.reasonCode,
+          current.params,
         );
+      }
       return respond(
         { voucher: voucherView(voucher) },
         inserted.changes ? 201 : 200,
@@ -449,13 +465,13 @@ export function createGoldenHourApi({
     const voucherMatch =
       /^\/api\/golden-hour\/vouchers\/([A-Za-z0-9_-]+)$/.exec(path);
     if (voucherMatch) {
-      if (method !== "GET") return fail("Metoden stöds inte.", 405);
+      if (method !== "GET") return fail("Metoden stöds inte.", 405, "error.method");
       const row = db
         .prepare(`${voucherQuery} WHERE v.id = ?`)
         .get(voucherMatch[1]);
-      if (!allowedDemo(row)) return fail("Kuponen kunne ikke findes.", 404);
+      if (!allowedDemo(row)) return fail("Kuponen kunne ikke findes.", 404, "error.voucherNotFound");
       return respond({ voucher: voucherView(row) });
     }
-    return fail("Sidan finns inte.", 404);
+    return fail("Sidan finns inte.", 404, "error.notFound");
   };
 }

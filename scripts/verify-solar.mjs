@@ -1,14 +1,16 @@
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 
+const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const browser = await chromium.launch({
   executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined,
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+await page.context().addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
 const errors = [];
 const expandFinder = async (target) => {
   const toggle = target.getByRole("button", {
-    name: "Vælg sted og tid",
+    name: "Välj plats och tid",
     exact: true,
   });
   if (await toggle.isVisible()) await toggle.click();
@@ -53,7 +55,7 @@ try {
   await page.route("**/api/weather", (route) =>
     route.fulfill({ json: clearWeather }),
   );
-  await page.goto(process.env.SUNSPOT_URL || "http://localhost:3000", {
+  await page.goto(base, {
     waitUntil: "domcontentloaded",
   });
   await ready();

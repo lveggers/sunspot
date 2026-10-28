@@ -13,42 +13,44 @@ import {
   Ticket,
 } from "lucide-react";
 import Modal from "./Modal.jsx";
+import { useLanguage } from "./Language.jsx";
 import "./theatre.css";
 
 const scenes = [
   {
     id: "bench-sun",
-    title: "Bænken i solen",
-    caption: "En bænk. En øl. Ingen hast.",
-    alt: "En skæv papfigur drikker øl på en københavnsk parkbænk under en sol i synlige snore.",
+    title: "theatre.scene.bench.title",
+    caption: "theatre.scene.bench.caption",
+    alt: "theatre.scene.bench.alt",
   },
   {
     id: "vestegnen",
-    title: "Vestegnen på tur",
-    caption: "Hele holdet er ude.",
-    alt: "En gruppe udtryksfulde voksne papfigurer i moderne streetwear nyder øl udenfor i København.",
+    title: "theatre.scene.vestegnen.title",
+    caption: "theatre.scene.vestegnen.caption",
+    alt: "theatre.scene.vestegnen.alt",
   },
   {
     id: "tiny-sun-patch",
-    title: "Den sidste solplet",
-    caption: "Der er altid plads til én mere.",
-    alt: "Flere voksne klemmer sig komisk ind i en lille trekant af sol på fortovet foran en bar.",
+    title: "theatre.scene.patch.title",
+    caption: "theatre.scene.patch.caption",
+    alt: "theatre.scene.patch.alt",
   },
   {
     id: "chasing-sun",
-    title: "Efter solen",
-    caption: "Lidt længere henne ad gaden.",
-    alt: "Langlemmede papfigurer følger en ophængt sol mellem københavnske bygninger og skygger.",
+    title: "theatre.scene.chase.title",
+    caption: "theatre.scene.chase.caption",
+    alt: "theatre.scene.chase.alt",
   },
   {
     id: "golden-hour-friends",
-    title: "Golden Hour",
-    caption: "Et sted at mødes.",
-    alt: "Venner samles med øl foran en københavnsk bar i gyldent lys, bygget som et lille papdukketeater.",
+    title: "theatre.scene.golden.title",
+    caption: "theatre.scene.golden.caption",
+    alt: "theatre.scene.golden.alt",
   },
 ];
 
 function SceneGallery({ onExploreMap }) {
+  const { language, t } = useLanguage();
   const [active, setActive] = useState(0);
   const tabs = useRef([]);
   const touchStart = useRef(null);
@@ -70,18 +72,18 @@ function SceneGallery({ onExploreMap }) {
     tabs.current[next]?.focus();
   }
   return (
-    <div className="theatre-content" lang="da">
+    <div className="theatre-content" lang={language}>
       <div className="theatre-intro">
-        <p className="theatre-eyebrow">ET LILLE STYKKE KØBENHAVN</p>
-        <h3>Ud i det gode selskab.</h3>
+        <p className="theatre-eyebrow">{t("theatre.eyebrow")}</p>
+        <h3>{t("theatre.heading")}</h3>
         <p className="theatre-illustration-label">
-          Illustrationer · ikke sol- eller vejrdata
+          {t("theatre.illustration")}
         </p>
       </div>
       <div
         className="theatre-tabs"
         role="tablist"
-        aria-label="Scener fra København"
+        aria-label={t("theatre.scenes")}
         onKeyDown={tabKey}
       >
         {scenes.map((item, index) => (
@@ -98,7 +100,7 @@ function SceneGallery({ onExploreMap }) {
             }}
             onClick={() => setActive(index)}
           >
-            {item.title}
+            {t(item.title)}
           </button>
         ))}
       </div>
@@ -130,7 +132,7 @@ function SceneGallery({ onExploreMap }) {
         <Image
           key={scene.id}
           src={illustrations[scene.id]}
-          alt={scene.alt}
+          alt={t(scene.alt)}
           placeholder="blur"
           width={1536}
           height={1024}
@@ -142,44 +144,45 @@ function SceneGallery({ onExploreMap }) {
           <span className="theatre-scene-number">
             {String(active + 1).padStart(2, "0")} / 05
           </span>
-          <span>{scene.caption}</span>
+          <span>{t(scene.caption)}</span>
         </figcaption>
       </figure>
       <div className="theatre-navigation">
         <button
           type="button"
-          aria-label="Forrige scene"
+          aria-label={t("theatre.previous")}
           onClick={() => move(-1)}
         >
           <ArrowLeft size={19} />
         </button>
-        <span>{scene.title}</span>
-        <button type="button" aria-label="Næste scene" onClick={() => move(1)}>
+        <span>{t(scene.title)}</span>
+        <button type="button" aria-label={t("theatre.next")} onClick={() => move(1)}>
           <ArrowRight size={19} />
         </button>
       </div>
       <section
         className="theatre-cast"
-        aria-label="SunSpots komplette karaktergalleri"
+        aria-label={t("theatre.gallery")}
       >
         <div className="theatre-cast-heading">
-          <h3>Hele holdet.</h3>
-          <span>9 figurer · København 2026</span>
+          <h3>{t("theatre.cast")}</h3>
+          <span>{t("theatre.count")}</span>
         </div>
         <div className="theatre-character-grid">
-          {characters.map(({ id, name }) => (
+          {characters.map(({ id }) => (
             <figure
               className="theatre-character-card"
               role="img"
-              aria-label={name}
+              aria-label={t(`theatre.character.${id}`)}
               key={id}
             >
               <Character
                 character={id}
+                paper
                 className="theatre-character-portrait"
                 sizes="(max-width: 760px) calc((100vw - 88px) * 1.5), 860px"
               />
-              <figcaption>{name}</figcaption>
+              <figcaption>{t(`theatre.character.${id}`)}</figcaption>
             </figure>
           ))}
         </div>
@@ -192,7 +195,7 @@ function SceneGallery({ onExploreMap }) {
           onClick={onExploreMap}
         >
           <MapPin size={17} />
-          Tilbage til kortet
+          {t("theatre.backMap")}
           <ArrowRight size={17} />
         </button>
       )}
@@ -201,6 +204,7 @@ function SceneGallery({ onExploreMap }) {
 }
 
 function ExampleTicket({ startedAt }) {
+  const { t } = useLanguage();
   const [elapsed, setElapsed] = useState(() => performance.now() - startedAt);
   useEffect(() => {
     const timer = setInterval(
@@ -212,21 +216,22 @@ function ExampleTicket({ startedAt }) {
   const seconds = Math.max(0, Math.ceil((3600_000 - elapsed) / 1000));
   return (
     <div className="theatre-example-ticket">
-      <span className="theatre-demo-mark">EKSEMPELKUPON · IKKE GYLDIG</span>
-      <strong role="timer" aria-label="Tid tilbage på eksempelkuponen">
+      <span className="theatre-demo-mark">{t("theatre.exampleTicket")}</span>
+      <strong role="timer" aria-label={t("theatre.remaining")}>
         {String(Math.floor(seconds / 60)).padStart(2, "0")}:
         {String(seconds % 60).padStart(2, "0")}
       </strong>
       <span>
         {seconds
-          ? "Simuleret nedtælling. Kan ikke indløses."
-          : "Eksemplet er udløbet."}
+          ? t("theatre.countdown")
+          : t("theatre.expired")}
       </span>
     </div>
   );
 }
 
 export function GoldenHourExample({ compact = false }) {
+  const { language, t } = useLanguage();
   const [sunny, setSunny] = useState(true);
   const [startedAt, setStartedAt] = useState(null);
   const id = useId();
@@ -234,12 +239,12 @@ export function GoldenHourExample({ compact = false }) {
     <section
       className={`theatre-example ${compact ? "theatre-example-compact" : ""}`}
       data-demo="true"
-      lang="da"
-      aria-label="Golden Hour-eksempel"
+      lang={language}
+      aria-label={t("theatre.example")}
       aria-describedby={`${id}-source`}
     >
       <p className="theatre-demo-provenance" id={`${id}-source`}>
-        EKSEMPEL · simuleret sol, vejr og tilbud
+        {t("theatre.simulated")}
       </p>
       <div className="theatre-example-notification">
         <div className="theatre-example-picture">
@@ -250,26 +255,26 @@ export function GoldenHourExample({ compact = false }) {
             height={1024}
             sizes="(max-width: 760px) 100vw, 350px"
             loading="lazy"
-            alt="Illustreret eksempel: venner mødes foran en bar i et dukketeater af pap."
+            alt={t("theatre.exampleAlt")}
           />
           <span
             className={`theatre-example-weather ${sunny ? "" : "is-cloudy"}`}
           >
             {sunny ? <Sun size={16} /> : <Cloud size={16} />}
-            {sunny ? "Simuleret sol nu" : "Simuleret overskyet"}
+            {sunny ? t("theatre.simulatedSun") : t("theatre.simulatedCloud")}
           </span>
         </div>
         <div className="theatre-example-copy">
           <span className="theatre-eyebrow">GOLDEN HOUR</span>
           <h3>Café Stefanshus</h3>
           <p className="theatre-example-deal">
-            <strong>Øl til 10 kr.</strong>
-            <span>Tilbud i 60 minutter</span>
+            <strong>{t("theatre.beer")}</strong>
+            <span>{t("theatre.offerDuration")}</span>
           </p>
           <div
             className="theatre-weather-switch"
             role="group"
-            aria-label="Simuler eksempellets vejr"
+            aria-label={t("theatre.simulateWeather")}
           >
             <button
               type="button"
@@ -277,7 +282,7 @@ export function GoldenHourExample({ compact = false }) {
               onClick={() => setSunny(true)}
             >
               <Sun size={16} />
-              Solskin
+              {t("theatre.sunny")}
             </button>
             <button
               type="button"
@@ -285,7 +290,7 @@ export function GoldenHourExample({ compact = false }) {
               onClick={() => setSunny(false)}
             >
               <Cloud size={16} />
-              Overskyet
+              {t("theatre.cloudy")}
             </button>
           </div>
           {startedAt === null ? (
@@ -296,7 +301,7 @@ export function GoldenHourExample({ compact = false }) {
               onClick={() => setStartedAt(performance.now())}
             >
               <Ticket size={17} />
-              Prøv eksempelkuponen
+              {t("theatre.tryExample")}
               <ArrowRight size={17} />
             </button>
           ) : (
@@ -304,7 +309,7 @@ export function GoldenHourExample({ compact = false }) {
           )}
           {!sunny && startedAt === null && (
             <p className="theatre-demo-note" role="status">
-              Eksemplet kan kun startes i simuleret solskin.
+              {t("theatre.exampleBlocked")}
             </p>
           )}
           {startedAt !== null && (
@@ -313,7 +318,7 @@ export function GoldenHourExample({ compact = false }) {
               type="button"
               onClick={() => setStartedAt(null)}
             >
-              Nulstil eksempel
+              {t("theatre.reset")}
             </button>
           )}
         </div>
@@ -323,6 +328,7 @@ export function GoldenHourExample({ compact = false }) {
 }
 
 export default function BrandTheatre({ compact = false, onExploreMap }) {
+  const { language, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const explore = onExploreMap
     ? () => {
@@ -332,12 +338,12 @@ export default function BrandTheatre({ compact = false, onExploreMap }) {
     : undefined;
   if (!compact)
     return (
-      <section className="brand-theatre" aria-label="SunSpot dukketeater">
+      <section className="brand-theatre" aria-label={t("theatre.title")}>
         <SceneGallery onExploreMap={onExploreMap} />
       </section>
     );
   return (
-    <div className="brand-theatre theatre-compact" lang="da">
+    <div className="brand-theatre theatre-compact" lang={language}>
       <button
         className="theatre-launch"
         type="button"
@@ -352,12 +358,12 @@ export default function BrandTheatre({ compact = false, onExploreMap }) {
           loading="lazy"
           alt=""
         />
-        <span>Mød SunSpot-figurerne</span>
+        <span>{t("theatre.launch")}</span>
         <ArrowRight size={17} />
       </button>
       {open && (
         <Modal
-          title="SunSpot dukketeater"
+          title={t("theatre.title")}
           onClose={() => setOpen(false)}
           className="theatre-dialog"
         >

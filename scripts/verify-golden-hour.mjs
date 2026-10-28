@@ -11,6 +11,7 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
   reducedMotion: "reduce",
 });
+await context.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
 const page = await context.newPage();
 const errors = [];
 const waitForIllustration = async (artwork, filename) => {
@@ -36,15 +37,10 @@ const waitForIllustration = async (artwork, filename) => {
     .toBe(true);
   await artwork.evaluate((img) => img.decode());
 };
-const assertArtwork = (scope, category, filename) =>
-  waitForIllustration(
-    scope.locator(`.golden-offer-art.${category} img`),
-    filename,
-  );
 const assertCharacter = async (scope, name) => {
   const character = scope.locator(`.cast-character[data-character="${name}"]`);
   await expect(character).toHaveCount(1);
-  await waitForIllustration(character.locator("img"), "sunspot-complete-cast.png");
+  await waitForIllustration(character.locator("img"), "sunspot-cutout-cast.png");
 };
 
 page.on("pageerror", (error) => errors.push(error.message));
@@ -178,9 +174,13 @@ try {
     exact: true,
   });
   await expect(detail.getByText("Demo beer", { exact: true })).toBeVisible();
-  await assertArtwork(detail, "beer", "tiny-sun-patch.png");
-  await assertCharacter(detail.locator(".golden-offer-poster"), "football");
+  await assertCharacter(detail.locator(".golden-offer-summary"), "football");
   await expect(detail.locator(".golden-demo")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 667 });
+  await expect(
+    detail.getByRole("button", { name: "Hämta min kupong · 1 timme", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page
     .getByRole("button", { name: "Dela erbjudandet med vänner" })
     .click();
@@ -208,8 +208,12 @@ try {
     page.getByRole("timer", { name: "Tid kvar på kupongen" }),
   ).toHaveText(/^(45:00|44:\d{2})$/);
   await page.setViewportSize({ width: 390, height: 667 });
-  await waitForIllustration(page.locator(".golden-voucher img.golden-art"));
-  await assertCharacter(page.locator(".golden-voucher-stage"), "football");
+  await assertCharacter(page.locator(".golden-voucher-summary"), "football");
+  const proof = page.locator(".golden-voucher-proof");
+  await expect(proof.getByRole("timer")).toBeInViewport({ ratio: 1 });
+  await expect(
+    proof.getByRole("textbox", { name: "Kupongkod", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: "artifacts/golden-hour-voucher-mobile.png" });
   assert.ok(
     await page.evaluate(
@@ -232,8 +236,7 @@ try {
   await page.goto(`${base}/?offer=fixture-cocktail`, {
     waitUntil: "domcontentloaded",
   });
-  await assertArtwork(page, "cocktail", "golden-hour-friends.png");
-  await assertCharacter(page.locator(".golden-offer-poster"), "blue-coat");
+  await assertCharacter(page.locator(".golden-offer-summary"), "blue-coat");
   await page.evaluate(() => {
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -309,8 +312,9 @@ try {
     JSON.stringify({
       passed: true,
       checks: [
-        "offer deep links and drink artwork",
+        "offer deep links and a visible mobile claim button",
         "offer and mobile voucher characters decoded from the shared atlas",
+        "mobile voucher timer and code visible without scrolling",
         "public offer sharing",
         "immutable server-anchored countdown and reload",
         "expiry and redeemed states",

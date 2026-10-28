@@ -78,6 +78,7 @@ export function openingAt(raw, instant, duration = 0) {
             ? `Stänger om ${remaining} min`
             : "Öppet enligt OSM",
         remaining,
+        closesBeforeEnd: remaining < duration,
         raw,
       }
     : { state: "closed", label: "Stängt enligt OSM", remaining: 0, raw };

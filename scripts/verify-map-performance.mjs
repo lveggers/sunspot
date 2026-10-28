@@ -9,7 +9,7 @@ const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const errors = [];
 const expandFinder = async (target) => {
   const toggle = target.getByRole("button", {
-    name: "Vælg sted og tid",
+    name: "Välj plats och tid",
     exact: true,
   });
   if (await toggle.isVisible()) await toggle.click();
@@ -61,6 +61,7 @@ async function open(fallback = false) {
     viewport: { width: 390, height: 844 },
     reducedMotion: "reduce",
   });
+  await page.context().addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
   page.on("pageerror", (error) => errors.push(error.message));
   await page.clock.setSystemTime(new Date("2026-10-27T11:00:00Z"));
   if (fallback)
