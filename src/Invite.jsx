@@ -7,12 +7,16 @@ import {
   Clock3,
   Copy,
   MapPin,
+  Navigation,
   Users,
   X,
 } from "lucide-react";
-import { api, clock, dateLabel, durationLabel, saved, save, placeText } from "./lib.js";
-import Character from "./Character.jsx";
+import { api, clock, dateLabel, durationLabel, saved, save, placeText, sunshineWeather, weatherConditionLabel } from "./lib.js";
+import CharacterScene from "./CharacterScene.jsx";
+import { invitationCounts, selectInvitationMoment } from "./invitationExperience.js";
+import { getDirectionsUrl } from "./spotSearch.js";
 import { useLanguage } from "./Language.jsx";
+import "./invitation-experience.css";
 
 export default function Invite({ id }) {
   const { language, t, errorText } = useLanguage();
@@ -26,7 +30,10 @@ export default function Invite({ id }) {
     () => saved(`rsvp:${id}`)?.answer || "yes",
   );
   const [sent, setSent] = useState(false);
+  const [weatherSnapshot, setWeatherSnapshot] = useState(null);
   const hostToken = saved(`host:${id}`);
+  const startsAt = g?.startsAt;
+  const active = Boolean(g && !g.cancelled);
   const load = useCallback(
     (signal) =>
       api(`/gatherings/${id}`, {
@@ -48,6 +55,34 @@ export default function Invite({ id }) {
     load(controller.signal);
     return () => controller.abort();
   }, [load]);
+  useEffect(() => {
+    if (!startsAt || !active) return;
+    let controller;
+    const refresh = () => {
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      api("/weather", { signal: request.signal })
+        .then((weather) => {
+          if (!request.signal.aborted) setWeatherSnapshot({ startsAt, weather });
+        })
+        .catch((error) => {
+          if (!request.signal.aborted && error.name !== "AbortError")
+            setWeatherSnapshot({ startsAt, weather: { available: false } });
+        });
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    refresh();
+    const timer = setInterval(visible, 10 * 60_000);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      controller?.abort();
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [startsAt, active]);
   async function respond(event) {
     event.preventDefault();
     setBusy(true);
@@ -97,6 +132,27 @@ export default function Invite({ id }) {
       setError("flows.invite.copyFallback");
     }
   }
+  const weatherLoading = active && weatherSnapshot?.startsAt !== startsAt;
+  const weather = weatherSnapshot?.startsAt === startsAt ? weatherSnapshot?.weather : null;
+  const condition = sunshineWeather(weather, startsAt);
+  const counts = invitationCounts(g);
+  // Show nine people; use a grouped attendee view if large gatherings become common.
+  const visibleYes = Math.min(counts.yes, 9);
+  const moment = selectInvitationMoment({ invitation: g, weather, loading: weatherLoading, responded: sent || Boolean(saved(`rsvp:${id}`)?.editToken) });
+  const situation = moment.id.replace("invite-", "");
+  const copyKey = situation === "sun" && !g?.host ? "experience.invite.sunAnonymous" : `experience.invite.${situation}`;
+  const shareSection = g && (
+    <div className="share-section">
+      <label htmlFor="invite-url">{t("flows.invite.link")}</label>
+      <div className="copy-row">
+        <input id="invite-url" readOnly value={window.location.href} onFocus={(e) => e.target.select()} />
+        <button onClick={copy} aria-label={t("flows.invite.copy")}>
+          {copied ? <Check size={18} /> : <Copy size={18} />}
+        </button>
+      </div>
+      <p className="fineprint">{t("flows.invite.local")}</p>
+    </div>
+  );
   return (
     <main className="invite-page">
       <Link className="back-link" href="/">
@@ -122,10 +178,14 @@ export default function Invite({ id }) {
                 </p>
               </div>
               <div className="invite-cast">
-                <Character character={g.cancelled ? "green-jacket" : "puffer"} />
-                <Character character={g.cancelled ? "turtleneck" : "blue-shirt"} />
+                <CharacterScene moment={moment} />
+                {situation === "created" && <CharacterScene moment={{ ...moment, character: "stripes" }} />}
               </div>
             </div>
+            <p className="invite-moment-copy" data-invitation-state={moment.id}>
+              {t(copyKey, { hostName: g.host, time: clock(new Date(g.startsAt)), placeName: g.place?.name || t("experience.invite.placeFallback"), yesCount: counts.yes, maybeCount: counts.maybe, noCount: counts.no })}
+            </p>
+            {g.isHost && !g.cancelled && shareSection}
             <div className="invite-facts">
               <p>
                 <CalendarDays size={19} />
@@ -141,15 +201,38 @@ export default function Invite({ id }) {
                 {placeText(g.place, "meeting", language)}
               </p>
             </div>
+            {!g.cancelled && (
+              <p className="invite-weather" role="status">
+                {t("experience.invite.forecast", {
+                  date: dateLabel(g.startsAt, language),
+                  time: clock(new Date(g.startsAt)),
+                  condition: weatherLoading ? t("experience.invite.weatherLoading") : weather?.stale ? t("experience.invite.weatherStale") : weatherConditionLabel(condition, language),
+                })}
+              </p>
+            )}
             {g.message && <blockquote>{g.message}</blockquote>}
             <div className="rsvp-counts">
               <span>
                 <Check size={16} />
-                {t("flows.invite.yesCount", { count: g.counts.yes })}
+                {t("flows.invite.yesCount", { count: counts.yes })}
               </span>
-              <span>{t("flows.invite.maybeCount", { count: g.counts.maybe })}</span>
-              <span>{t("flows.invite.noCount", { count: g.counts.no })}</span>
+              <span>{t("flows.invite.maybeCount", { count: counts.maybe })}</span>
+              <span>{t("flows.invite.noCount", { count: counts.no })}</span>
             </div>
+            {counts.yes > 0 && !g.cancelled && (
+              <div className="rsvp-people" aria-hidden="true">
+                {Array.from({ length: visibleYes }, (_, index) => (
+                  <CharacterScene key={index} moment={{ id: "invite-responses", character: "blue-coat" }} sizes="96px" />
+                ))}
+                {counts.yes > visibleYes && <span>{t("experience.invite.moreYes", { count: counts.yes - visibleYes })}</span>}
+              </div>
+            )}
+            {situation === "responses" && !g.cancelled && g.place && (
+              <a className="primary wide invite-next-action" href={getDirectionsUrl(g.place)} target="_blank" rel="noreferrer">
+                {t("experience.invite.directions")} <Navigation size={18} />
+              </a>
+            )}
+            {g.cancelled && <Link href="/" className="secondary wide invite-next-action">{t("experience.invite.newInvitation")}</Link>}
             {!g.cancelled && (
               <form onSubmit={respond} className="rsvp-form">
                 <label htmlFor="guest-name">{t("flows.invite.name")}</label>
@@ -177,7 +260,7 @@ export default function Invite({ id }) {
                         className={answer === value ? "chosen" : ""}
                         key={value}
                       >
-                        <Character character={character} />
+                        <CharacterScene moment={{ id: `invite-answer-${value}`, character }} />
                         <span>
                           <input
                             type="radio"
@@ -209,21 +292,7 @@ export default function Invite({ id }) {
                 {errorText(error)}
               </p>
             )}
-            <div className="share-section">
-              <label htmlFor="invite-url">{t("flows.invite.link")}</label>
-              <div className="copy-row">
-                <input
-                  id="invite-url"
-                  readOnly
-                  value={window.location.href}
-                  onFocus={(e) => e.target.select()}
-                />
-                <button onClick={copy} aria-label={t("flows.invite.copy")}>
-                  {copied ? <Check size={18} /> : <Copy size={18} />}
-                </button>
-              </div>
-              <p className="fineprint">{t("flows.invite.local")}</p>
-            </div>
+            {(!g.isHost || g.cancelled) && shareSection}
             {g.isHost && (
               <section className="host-section">
                 <h2>{t("flows.invite.hostHeading")}</h2>

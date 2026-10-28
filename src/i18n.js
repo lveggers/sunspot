@@ -3,8 +3,11 @@ import map from "./locales/map.js";
 import finder from "./locales/finder.js";
 import theatre from "./locales/theatre.js";
 import flows from "./locales/flows.js";
+import characterExperience from "./locales/characterExperience.js";
+import offerExperience from "./locales/offerExperience.js";
+import invitationExperience from "./locales/invitationExperience.js";
 
-export const messages = { ...common, ...map, ...finder, ...theatre, ...flows };
+export const messages = { ...common, ...map, ...finder, ...theatre, ...flows, ...characterExperience, ...offerExperience, ...invitationExperience };
 export const normalizeLanguage = (value) => ["da", "en", "sv"].includes(value) ? value : "da";
 export const localeFor = (language) => ({ da: "da-DK", en: "en-GB", sv: "sv-SE" })[normalizeLanguage(language)];
 

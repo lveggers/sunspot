@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { illustrations } from "./illustrations.js";
+import { characterPoses } from "./characterPoses.js";
 import "./characters.css";
 
 export const characters = [
@@ -23,7 +24,13 @@ export const categoryCharacters = {
 // Cutout row bounds include the top row's shoes; update if that sheet is replaced.
 const cutoutRows = [0, 544, 1024, 1536];
 
-export default function Character({ character, className = "", sizes = "600px", paper = false }) {
+export default function Character({ character, className = "", sizes = "600px", paper = false, pose }) {
+  const variant = !paper && characterPoses[pose];
+  if (variant) return (
+    <span className={`cast-character cast-pose ${className}`} data-character={character} data-pose={pose} aria-hidden="true">
+      <Image src={variant} alt="" placeholder="blur" sizes={sizes} />
+    </span>
+  );
   const index = characters.findIndex(({ id }) => id === character);
   const column = index % 3;
   const row = Math.floor(index / 3);

@@ -124,27 +124,6 @@ body {
   line-height: 1.5;
   color: var(--muted);
 }
-.hero-cast {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  height: 184px;
-  pointer-events: none;
-}
-.hero-cast .cast-character {
-  width: 120px;
-  margin-inline: -30px;
-}
-.hero-cast [data-character="blue-shirt"] {
-  transform: rotate(-5deg) translateY(5px);
-}
-.hero-cast [data-character="curls"] {
-  z-index: 1;
-}
-.hero-cast [data-character="turtleneck"] {
-  transform: rotate(5deg) translateY(-3px);
-}
 .finder-edit-row {
   display: flex;
   align-items: center;
@@ -654,13 +633,6 @@ body {
     min-height: 128px;
     margin-bottom: 8px;
   }
-  .hero-cast {
-    height: 128px;
-  }
-  .hero-cast .cast-character {
-    width: 90px;
-    margin-inline: -15px;
-  }
   .hero-invitation {
     display: none;
   }
@@ -765,13 +737,6 @@ body {
   }
   .hero-invitation {
     display: none;
-  }
-  .hero-cast {
-    height: 110px;
-  }
-  .hero-cast .cast-character {
-    width: 48%;
-    margin-inline: -7.333%;
   }
   .finder-toggle {
     display: flex;

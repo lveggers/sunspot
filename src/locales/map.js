@@ -1,4 +1,7 @@
 const map = {
+  "map.sunFocusTitle": { da: "Solsteder i farver", en: "Sunny places in colour", sv: "Solplatser i färg" },
+  "map.sunFocusConditions": { da: "Farve kræver beregnet sol, en frisk solprognose og bekræftet åbent. Skyer, regn og usikre data giver ingen farve.", en: "Colour requires calculated sunlight, a fresh sunny forecast and confirmed opening. Cloud, rain and uncertain data add no colour.", sv: "Färg kräver beräknad sol, en aktuell solprognos och bekräftat öppet. Moln, regn och osäkra data ger ingen färg." },
+  "map.sunFocusContext": { da: "De farvede udsnit fremhæver stederne i kortet. De viser ikke en opmålt solgrænse eller sol på hele parkarealet.", en: "The coloured windows highlight places on the map. They are not measured sunlight boundaries or a claim of sun across an entire park.", sv: "De färgade utsnitten lyfter fram platserna på kartan. De är inte uppmätta solgränser eller sol över hela parkområdet." },
   "map.region": { da: "Kort over steder i København", en: "Map of places in Copenhagen", sv: "Karta över platser i Köpenhamn" },
   "map.tools": { da: "Kortværktøjer", en: "Map tools", sv: "Kartverktyg" },
   "map.zoomIn": { da: "Zoom ind", en: "Zoom in", sv: "Zooma in" },

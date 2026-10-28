@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { illustrations } from "./illustrations.js";
 import { GoldenHourExample } from "./BrandTheatre.jsx";
-import Character from "./Character.jsx";
+import CharacterScene from "./CharacterScene.jsx";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -20,37 +18,16 @@ import { api, clock, save, saved } from "./lib.js";
 import { places } from "./places.js";
 import { getDirectionsUrl } from "./spotSearch.js";
 import { useLanguage, LanguageSwitcher } from "./Language.jsx";
-import { localeFor } from "./i18n.js";
+import { messages } from "./i18n.js";
+import {
+  formatOfferPrice as money,
+  selectOfferMoment,
+  selectVoucherMoment,
+} from "./offerExperience.js";
+import "./offer-experience.css";
 
-const money = (value, language) =>
-  new Intl.NumberFormat(localeFor(language), {
-    style: "currency",
-    currency: "DKK",
-    maximumFractionDigits: 2,
-  }).format(value);
 const publicOfferUrl = (id) =>
   `${window.location.origin}/?offer=${encodeURIComponent(id)}`;
-const offerCharacter = (kind) => kind === "cocktail" ? "blue-coat" : "football";
-
-export function GoldenHourArt({ kind = "sun", className = "" }) {
-  const source =
-    kind === "cocktail" || kind === "scene"
-      ? illustrations["golden-hour-friends"]
-      : kind === "beer"
-        ? illustrations["tiny-sun-patch"]
-        : illustrations["bench-sun"];
-  return (
-    <Image
-      className={`golden-art ${className}`}
-      src={source}
-      alt=""
-      placeholder="blur"
-      width={1536}
-      height={1024}
-      sizes="(max-width: 760px) 92vw, 480px"
-    />
-  );
-}
 
 function PublicShare({ offer }) {
   const { t } = useLanguage();
@@ -130,25 +107,31 @@ function VoucherCard({ voucher, serverNow }) {
       serverNow={serverNow}
     >
       {({ remaining, label }) => {
-        const expired = remaining <= 0;
-        const used = Boolean(voucher.redeemedAt);
+        const moment = selectVoucherMoment({ voucher, remaining });
+        const expired = moment.id === "voucher.expired";
+        const used = moment.id === "voucher.redeemed";
         return (
           <div
             className={`golden-voucher ${expired || used ? "is-expired" : ""}`}
+            data-experience={moment.id}
           >
             <div className="golden-voucher-heading">
               <Ticket size={22} />
               <span>{t("flows.voucher.heading")}</span>
             </div>
             {voucher.demo && (
-              <p className="golden-demo">{t("flows.voucher.demo")}</p>
+              <p className="golden-demo">{t("offerExperience.voucher.demo")}</p>
             )}
             <div className="golden-voucher-summary">
               <div>
                 <h3>{voucher.title}</h3>
                 <p>{voucher.placeName} · {money(voucher.priceDkk, language)}</p>
               </div>
-              <Character character={offerCharacter(voucher.kind)} />
+              <CharacterScene
+                moment={moment}
+                className="offer-experience-character"
+                sizes="100px"
+              />
             </div>
             <div className="golden-voucher-proof">
               <div
@@ -170,12 +153,11 @@ function VoucherCard({ voucher, serverNow }) {
                 />
               </label>
             </div>
-            <p>
-              {used
-                ? t("flows.voucher.usedHelp")
-                : expired
-                  ? t("flows.voucher.expiredHelp")
-                  : t("flows.voucher.showHelp")}
+            <p className="offer-experience-copy">
+              {t(`offerExperience.${moment.id}`, {
+                title: voucher.title,
+                time: clock(new Date(used ? voucher.redeemedAt : voucher.expiresAt)),
+              })}
             </p>
             <small>
               {t("flows.voucher.validUntil", { time: clock(new Date(voucher.expiresAt)) })}
@@ -188,6 +170,12 @@ function VoucherCard({ voucher, serverNow }) {
               <ArrowUpRight size={16} />
               {t("flows.voucher.open")}
             </Link>
+            {(expired || used) && (
+              <Link className="golden-text-button" href="/">
+                <ArrowLeft size={16} />
+                {t("offerExperience.backPlaces")}
+              </Link>
+            )}
           </div>
         );
       }}
@@ -201,6 +189,7 @@ function OfferDetail({ id }) {
   const [coupon, setCoupon] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [claimRejected, setClaimRejected] = useState(false);
   useEffect(() => {
     let controller;
     const refresh = () => {
@@ -214,6 +203,7 @@ function OfferDetail({ id }) {
           if (!request.signal.aborted) {
             setData(value);
             setError("");
+            setClaimRejected(false);
           }
         })
         .catch((cause) => {
@@ -246,6 +236,7 @@ function OfferDetail({ id }) {
   async function claim() {
     setBusy(true);
     setError("");
+    setClaimRejected(false);
     try {
       const value = await api(
         `/golden-hour/offers/${encodeURIComponent(id)}/claim`,
@@ -258,6 +249,7 @@ function OfferDetail({ id }) {
         );
     } catch (cause) {
       setError(cause);
+      setClaimRejected(cause.status >= 400 && cause.status < 500);
     } finally {
       setBusy(false);
     }
@@ -281,10 +273,14 @@ function OfferDetail({ id }) {
     );
   const { offer, eligibilityReason } = data;
   const place = places.find((item) => item.id === offer.placeId);
+  const moment = selectOfferMoment({ offer, busy, rejected: claimRejected });
+  const rejectionReason = error?.code && Object.hasOwn(messages, error.code)
+    ? errorText(error)
+    : t("offerExperience.rejectedFallback");
   return (
-    <div className="golden-offer-detail">
+    <div className="golden-offer-detail" data-experience={moment.id}>
       {offer.demo && (
-        <p className="golden-demo">{t("flows.offer.demo")}</p>
+        <p className="golden-demo">{t("offerExperience.offer.demo")}</p>
       )}
       <div className="golden-offer-summary">
         <div>
@@ -295,7 +291,11 @@ function OfferDetail({ id }) {
           <h3>{offer.title}</h3>
           <strong className="golden-price">{money(offer.priceDkk, language)}</strong>
         </div>
-        <Character character={offerCharacter(offer.kind)} />
+        <CharacterScene
+          moment={moment}
+          className="offer-experience-character"
+          sizes="100px"
+        />
       </div>
       <p>{offer.description}</p>
       <p className="golden-availability" role="status">
@@ -316,7 +316,19 @@ function OfferDetail({ id }) {
       <small className="golden-terms">{t("flows.offer.terms")}</small>
       {error && (
         <p className="error" role="alert">
-          {errorText(error)}
+          {claimRejected
+            ? t("offerExperience.offer.rejected", { reason: rejectionReason })
+            : errorText(error)}
+        </p>
+      )}
+      {!claimRejected && !offer.demo && (
+        <p className="offer-experience-copy" role={busy ? "status" : undefined}>
+          {t(`offerExperience.${moment.id}`)}
+        </p>
+      )}
+      {offer.demo && busy && (
+        <p className="offer-experience-copy" role="status">
+          {t("offerExperience.offer.checking")}
         </p>
       )}
       {place && (
@@ -396,8 +408,12 @@ export function GoldenHourDiscovery({ compact = false }) {
         className="golden-discovery-button"
         onClick={() => setOpen(true)}
       >
-        <Character character="puffer" />
-        <span>
+        <CharacterScene
+          moment={selectOfferMoment({ offer: offers[0] })}
+          className="offer-experience-discovery-character"
+          sizes="64px"
+        />
+        <span className="golden-discovery-copy">
           <strong>{t("flows.discovery.heading")}</strong>
           <small>
             {loading
@@ -439,7 +455,6 @@ export function GoldenHourDiscovery({ compact = false }) {
                   <h3>{t("flows.discovery.questionTop")}<br />
                     {t("flows.discovery.questionBottom")}</h3>
                 </div>
-                <Character character="football" />
               </div>
               <p className="golden-list-copy">{t("flows.discovery.help")}</p>
               {loading ? (
@@ -447,10 +462,9 @@ export function GoldenHourDiscovery({ compact = false }) {
               ) : error ? (
                 <p role="alert">{errorText(error)}</p>
               ) : !offers.length ? (
-                <div className="golden-empty">
+                <div className="golden-empty" data-experience="offer.none">
                   <Sun size={25} />
-                  <h3>{t("flows.discovery.wait")}</h3>
-                  <p>{t("flows.discovery.waitHelp")}</p>
+                  <p>{t("offerExperience.offer.none")}</p>
                 </div>
               ) : (
                 <div className="golden-offer-list">
@@ -459,9 +473,14 @@ export function GoldenHourDiscovery({ compact = false }) {
                       type="button"
                       key={offer.id}
                       className={`golden-offer-card ${offer.kind}`}
+                      data-experience={selectOfferMoment({ offer }).id}
                       onClick={() => setActiveId(offer.id)}
                     >
-                      <Character character={offerCharacter(offer.kind)} />
+                      <CharacterScene
+                        moment={selectOfferMoment({ offer })}
+                        className="offer-experience-card-character"
+                        sizes="96px"
+                      />
                       <span>
                         <small>
                           {offer.placeName}
@@ -687,7 +706,6 @@ export function PartnerPortal() {
           </h1>
           <p>{t("flows.partner.intro")}</p>
         </div>
-        <GoldenHourArt kind="scene" />
       </section>
       {error && (
         <p className="partner-message error" role="alert">
@@ -729,21 +747,23 @@ export function PartnerPortal() {
               <ArrowUpRight size={19} />
             </button>
           </form>
-          <div className="golden-demo-panel">
-            <strong>{t("flows.partner.demo")}</strong>
-            <p>{t("flows.partner.demoHelp")}</p>
-            <button
-              type="button"
-              className="golden-text-button"
-              onClick={() => {
-                setEmail("demo@sunspot.local");
-                setPassword("sunspot-local-demo");
-              }}
-            >
-              {t("flows.partner.fillDemo")}
-              <ArrowUpRight size={14} />
-            </button>
-          </div>
+          {process.env.NODE_ENV === "development" && (
+            <div className="golden-demo-panel">
+              <strong>{t("flows.partner.demo")}</strong>
+              <p>{t("flows.partner.demoHelp")}</p>
+              <button
+                type="button"
+                className="golden-text-button"
+                onClick={() => {
+                  setEmail("demo@sunspot.local");
+                  setPassword("sunspot-local-demo");
+                }}
+              >
+                {t("flows.partner.fillDemo")}
+                <ArrowUpRight size={14} />
+              </button>
+            </div>
+          )}
         </section>
       ) : (
         <>
@@ -825,7 +845,6 @@ export function PartnerPortal() {
             <section className="paper-card partner-offers">
               <div className="partner-section-heading">
                 <h2>{t("flows.partner.offers")}</h2>
-                <GoldenHourArt kind="cocktail" />
               </div>
               <p className="partner-eligibility" role="status">
                 {dashboard.eligibility.allowed
@@ -836,6 +855,11 @@ export function PartnerPortal() {
               <div className="partner-offer-list">
                 {dashboard.offers.map((offer) => (
                   <article key={offer.id} className="partner-offer">
+                    <CharacterScene
+                      moment={selectOfferMoment({ offer })}
+                      className="offer-experience-partner-character"
+                      sizes="64px"
+                    />
                     <span className="golden-state">
                       {offer.state === "draft"
                         ? t("flows.partner.draft")
@@ -846,7 +870,11 @@ export function PartnerPortal() {
                     </span>
                     <h3>{offer.title}</h3>
                     <p>
-                      {offer.kind === "beer" ? t("flows.partner.beer") : t("flows.partner.cocktail")} ·{" "}
+                      {offer.kind === "beer"
+                        ? t("flows.partner.beer")
+                        : offer.kind === "cocktail"
+                          ? t("flows.partner.cocktail")
+                          : t("offerExperience.otherKind")} ·{" "}
                       {money(offer.priceDkk, language)}
                     </p>
                     {offer.state === "draft" ? (

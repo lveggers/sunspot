@@ -1,23 +1,24 @@
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
+import { formatOfferPrice } from "../src/offerExperience.js";
 
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const copy = {
   da: {
     language: "Sprog", find: "Find min plads i solen", near: "Nær mig", today: "I dag",
     claim: "Hent min kupon · 1 time", code: "Kuponkode", locale: "da-DK",
-    locationError: "Positionen kunne ikke hentes. Tillad adgang, eller vælg et område.",
+    locationError: "Du sagde nej til position. Vælg et område. Så lader vi som om, det var planen.",
   },
   en: {
     language: "Language", find: "Find my spot in the sun", near: "Near me", today: "Today",
     claim: "Get my voucher · 1 hour", code: "Voucher code", locale: "en-GB",
-    locationError: "Your location could not be obtained. Allow location access or choose an area.",
+    locationError: "You said no to location. Pick an area. We'll pretend that was the plan.",
   },
   sv: {
     language: "Språk", find: "Hitta min plats i solen", near: "Nära mig", today: "Idag",
     claim: "Hämta min kupong · 1 timme", code: "Kupongkod", locale: "sv-SE",
-    locationError: "Positionen kunde inte hämtas. Tillåt platsåtkomst eller välj ett område.",
+    locationError: "Du sa nej till plats. Välj ett område. Så låtsas vi att det var planen.",
   },
 };
 const browser = await chromium.launch({ executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined });
@@ -115,7 +116,12 @@ const finderValues = () => page.evaluate(() => ({
   time: document.querySelector('input[type="time"]').value,
   categories: [...document.querySelectorAll(".finder-types [data-category]")].map((button) => [button.dataset.category, button.getAttribute("aria-pressed")]),
 }));
-const money = (language) => new Intl.NumberFormat(copy[language].locale, { style: "currency", currency: "DKK", maximumFractionDigits: 2 }).format(offer.priceDkk);
+const money = (language) => {
+  const value = formatOfferPrice(offer.priceDkk, language);
+  assert.ok(value.includes(language === "da" ? "kr." : "DKK"), `${language} identifies Danish kroner`);
+  assert.match(value, /123[,.]5(?:\D|$)/, `${language} preserves the actual decimal price`);
+  return value;
+};
 const assertInviteDate = (language) => expect(page.locator(".invite-facts p").first()).toHaveText(
   new Intl.DateTimeFormat(copy[language].locale, { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Copenhagen" }).format(new Date(invitation.startsAt)),
 );
@@ -134,13 +140,14 @@ try {
   await page.locator('input[type="time"]').fill("13:15");
   await page.locator('.finder-types [data-category="restaurant"]').click();
   await page.locator(".nearby-button").click();
-  await expect(page.locator(".finder-notice")).toHaveText(copy.da.locationError);
+  const locationNotice = page.locator('.experience-hero[data-experience="empty.location"] .hero-invitation');
+  await expect(locationNotice).toHaveText(copy.da.locationError);
   const values = await finderValues();
   for (const language of ["en", "sv"]) {
     await setLanguage(language);
     await assertFinderCopy(language);
     assert.deepEqual(await finderValues(), values, "language changes preserve the chosen place, date, time and categories");
-    await expect(page.locator(".finder-notice")).toHaveText(copy[language].locationError);
+    await expect(locationNotice).toHaveText(copy[language].locationError);
     await page.screenshot({ path: `artifacts/language-finder-${language}.png` });
   }
   assert.equal(mutations.claims, 0);

@@ -14,7 +14,10 @@ import {
 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import { useLanguage } from "./Language.jsx";
+import CharacterScene from "./CharacterScene.jsx";
+import { formatOfferPrice, selectExampleMoment } from "./offerExperience.js";
 import "./theatre.css";
+import "./offer-experience.css";
 
 const scenes = [
   {
@@ -214,18 +217,20 @@ function ExampleTicket({ startedAt }) {
     return () => clearInterval(timer);
   }, [startedAt]);
   const seconds = Math.max(0, Math.ceil((3600_000 - elapsed) / 1000));
+  const moment = selectExampleMoment({ started: true, remaining: seconds });
   return (
-    <div className="theatre-example-ticket">
+    <div className="theatre-example-ticket" data-experience={moment.id}>
       <span className="theatre-demo-mark">{t("theatre.exampleTicket")}</span>
+      <CharacterScene
+        moment={moment}
+        className="offer-experience-example-character"
+        sizes="80px"
+      />
       <strong role="timer" aria-label={t("theatre.remaining")}>
         {String(Math.floor(seconds / 60)).padStart(2, "0")}:
         {String(seconds % 60).padStart(2, "0")}
       </strong>
-      <span>
-        {seconds
-          ? t("theatre.countdown")
-          : t("theatre.expired")}
-      </span>
+      <span>{t(`offerExperience.${moment.id}`)}</span>
     </div>
   );
 }
@@ -235,10 +240,12 @@ export function GoldenHourExample({ compact = false }) {
   const [sunny, setSunny] = useState(true);
   const [startedAt, setStartedAt] = useState(null);
   const id = useId();
+  const moment = selectExampleMoment({ sunny });
   return (
     <section
       className={`theatre-example ${compact ? "theatre-example-compact" : ""}`}
       data-demo="true"
+      data-experience={startedAt === null ? moment.id : undefined}
       lang={language}
       aria-label={t("theatre.example")}
       aria-describedby={`${id}-source`}
@@ -246,29 +253,32 @@ export function GoldenHourExample({ compact = false }) {
       <p className="theatre-demo-provenance" id={`${id}-source`}>
         {t("theatre.simulated")}
       </p>
-      <div className="theatre-example-notification">
-        <div className="theatre-example-picture">
-          <Image
-            src={illustrations["golden-hour-friends"]}
-            placeholder="blur"
-            width={1536}
-            height={1024}
-            sizes="(max-width: 760px) 100vw, 350px"
-            loading="lazy"
-            alt={t("theatre.exampleAlt")}
-          />
-          <span
-            className={`theatre-example-weather ${sunny ? "" : "is-cloudy"}`}
-          >
-            {sunny ? <Sun size={16} /> : <Cloud size={16} />}
-            {sunny ? t("theatre.simulatedSun") : t("theatre.simulatedCloud")}
-          </span>
-        </div>
+      <p className="offer-experience-copy">{t("offerExperience.example.offer")}</p>
+      <div
+        className={`theatre-example-notification ${startedAt === null ? "" : "has-example-ticket"}`}
+      >
+        {startedAt === null && (
+          <div className="theatre-example-picture">
+            <CharacterScene
+              moment={moment}
+              className="offer-experience-example-character"
+              sizes="110px"
+            />
+            <span
+              className={`theatre-example-weather ${sunny ? "" : "is-cloudy"}`}
+            >
+              {sunny ? <Sun size={16} /> : <Cloud size={16} />}
+              {sunny ? t("theatre.simulatedSun") : t("theatre.simulatedCloud")}
+            </span>
+          </div>
+        )}
         <div className="theatre-example-copy">
           <span className="theatre-eyebrow">GOLDEN HOUR</span>
           <h3>Café Stefanshus</h3>
           <p className="theatre-example-deal">
-            <strong>{t("theatre.beer")}</strong>
+            <strong>
+              {t("offerExperience.example.beer", { price: formatOfferPrice(10, language) })}
+            </strong>
             <span>{t("theatre.offerDuration")}</span>
           </p>
           <div
@@ -309,7 +319,7 @@ export function GoldenHourExample({ compact = false }) {
           )}
           {!sunny && startedAt === null && (
             <p className="theatre-demo-note" role="status">
-              {t("theatre.exampleBlocked")}
+              {t("offerExperience.example.blocked")}
             </p>
           )}
           {startedAt !== null && (

@@ -132,9 +132,10 @@ try {
   for (const name of ["Park", "Mat"])
     await page.getByRole("button", { name, exact: true }).click();
   await find();
-  await expect(page.locator(".finder-empty")).toContainText(
-    "Välj minst en typ",
+  await expect(page.locator('.finder-empty[data-experience="empty.no-types"] > p')).toHaveText(
+    "Inga typer valda. Välj minst en. Vi gissar inte åt dig.",
   );
+  await expect(page.locator(".finder-empty").getByRole("button", { name: "Välj område och typer", exact: true })).toBeVisible();
   await expect(page.locator(".place-pin")).toHaveCount(0);
   await page
     .getByRole("button", { name: "Ändra sökning", exact: true })
@@ -145,7 +146,10 @@ try {
   await find();
   await expect(page.locator(".finder-summary")).toContainText("2 match");
   await expect(page.locator(".detail-card")).toContainText("Café Stefanshus");
-  await expect(page.locator(".venue-focus-veil")).toHaveCount(1);
+  const sunFocus = page.locator(".sun-focus-color-pane");
+  await expect(sunFocus).toHaveCount(1);
+  await expect(sunFocus).toHaveCSS("pointer-events", "none");
+  await expect.poll(async () => Number(await sunFocus.getAttribute("data-active-count"))).toBeGreaterThan(0);
   const direction = new URL(
     await page.getByRole("link", { name: "Ta mig dit" }).getAttribute("href"),
   );
@@ -169,7 +173,7 @@ try {
   await page.evaluate(() =>
     document.dispatchEvent(new Event("visibilitychange")),
   );
-  await expect(page.locator(".finder-empty")).toContainText("Moln eller dimma");
+  await expect(page.locator('.finder-empty[data-experience="weather.cloud"] > p')).toHaveText("Himlen har dragit för gardinen och låtsas inte vara hemma.");
   await expect(page.locator(".place-pin")).toHaveCount(0);
   weatherMode = "clear";
   await page.evaluate(() =>
@@ -227,15 +231,16 @@ try {
   await expect(page.getByText("TRÄFFEN ÄR INSTÄLLD")).toBeVisible();
   await guestContext.close();
 
-  for (const [mode, message] of [
-    ["cloud", "Moln eller dimma"],
-    ["rain", "Nederbörd"],
-    ["missing", "väderprognos saknas"],
+  for (const [mode, moment, message, action] of [
+    ["cloud", "weather.cloud", "Himlen har dragit för gardinen och låtsas inte vara hemma.", "Välj en annan tid"],
+    ["rain", "weather.rain", "Det regnar. Vi hittar inte på sol. Prova en senare tid.", "Välj en annan tid"],
+    ["missing", "weather.missing", "Vi saknar väderdata för den tiden. Vi gissar inte om himlen.", "Hämta vädret igen"],
   ]) {
     weatherMode = mode;
     await open();
     await find();
-    await expect(page.locator(".finder-empty")).toContainText(message);
+    await expect(page.locator(`.finder-empty[data-experience="${moment}"] > p`)).toHaveText(message);
+    await expect(page.locator(".finder-empty").getByRole("button", { name: action, exact: true })).toBeVisible();
     await expect(page.locator(".place-pin")).toHaveCount(0);
     await expect(page.locator(".detail-card")).toHaveCount(0);
   }
@@ -309,9 +314,9 @@ try {
     nearby.getByRole("button", { name: "Inom 1,5 km från dig" }),
   ).toBeVisible();
   await geoContext.close();
-  for (const [position, permissions, message] of [
-    [{ latitude: 56, longitude: 10 }, ["geolocation"], "centrala Köpenhamn"],
-    [{ latitude: 55.69, longitude: 12.55 }, [], "Positionen kunde inte hämtas"],
+  for (const [position, permissions, moment, message] of [
+    [{ latitude: 56, longitude: 10 }, ["geolocation"], "empty.outside", "Du är utanför Köpenhamn. Vi täcker inte resten ännu. Välj ett område i stan."],
+    [{ latitude: 55.69, longitude: 12.55 }, [], "empty.location", "Du sa nej till plats. Välj ett område. Så låtsas vi att det var planen."],
   ]) {
     const scenario = await browser.newContext({
       geolocation: position,
@@ -328,7 +333,7 @@ try {
     await locationPage
       .getByRole("button", { name: "Nära mig", exact: true })
       .click();
-    await expect(locationPage.getByRole("status")).toContainText(message, {
+    await expect(locationPage.locator(`.experience-hero[data-experience="${moment}"] .hero-invitation`)).toHaveText(message, {
       timeout: 15000,
     });
     await scenario.close();

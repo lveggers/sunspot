@@ -29,5 +29,6 @@ Mødets afsnit om andre bygge-/ejendomsprojekter er udeladt fra SunSpot-kravene.
 - Synligt, vedvarende sprogskift mellem dansk, engelsk og svensk.
 - Tør, karikeret, lidt offensiv dansk voksenhumor med social akavethed og Klovn-vibes som tonereference. Teksterne er originale.
 - De ni godkendte karakteridentiteter og deres grafiske stil bevares.
+- Erstat shademap-visningen med et kort, hvor bekræftede solsteder fremhæves i farver og resten dæmpes i gråt. Skyer skal indgå i beslutningen.
 
 Disse supplerende krav kommer fra denne chat og må ikke tilskrives Jurnie-mødet.

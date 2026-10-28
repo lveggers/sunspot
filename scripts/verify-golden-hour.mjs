@@ -37,10 +37,11 @@ const waitForIllustration = async (artwork, filename) => {
     .toBe(true);
   await artwork.evaluate((img) => img.decode());
 };
-const assertCharacter = async (scope, name) => {
+const assertCharacter = async (scope, name, pose) => {
   const character = scope.locator(`.cast-character[data-character="${name}"]`);
   await expect(character).toHaveCount(1);
-  await waitForIllustration(character.locator("img"), "sunspot-cutout-cast.png");
+  await expect(character).toHaveAttribute("data-pose", pose);
+  await waitForIllustration(character.locator("img"), `${pose}.png`);
 };
 
 page.on("pageerror", (error) => errors.push(error.message));
@@ -174,7 +175,7 @@ try {
     exact: true,
   });
   await expect(detail.getByText("Demo beer", { exact: true })).toBeVisible();
-  await assertCharacter(detail.locator(".golden-offer-summary"), "football");
+  await assertCharacter(detail.locator(".golden-offer-summary"), "puffer", "beer-seated");
   await expect(detail.locator(".golden-demo")).toBeVisible();
   await page.setViewportSize({ width: 390, height: 667 });
   await expect(
@@ -208,7 +209,7 @@ try {
     page.getByRole("timer", { name: "Tid kvar på kupongen" }),
   ).toHaveText(/^(45:00|44:\d{2})$/);
   await page.setViewportSize({ width: 390, height: 667 });
-  await assertCharacter(page.locator(".golden-voucher-summary"), "football");
+  await assertCharacter(page.locator(".golden-voucher-summary"), "puffer", "beer-seated");
   const proof = page.locator(".golden-voucher-proof");
   await expect(proof.getByRole("timer")).toBeInViewport({ ratio: 1 });
   await expect(
@@ -236,7 +237,7 @@ try {
   await page.goto(`${base}/?offer=fixture-cocktail`, {
     waitUntil: "domcontentloaded",
   });
-  await assertCharacter(page.locator(".golden-offer-summary"), "blue-coat");
+  await assertCharacter(page.locator(".golden-offer-summary"), "blue-coat", "cocktail-seated");
   await page.evaluate(() => {
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -313,7 +314,7 @@ try {
       passed: true,
       checks: [
         "offer deep links and a visible mobile claim button",
-        "offer and mobile voucher characters decoded from the shared atlas",
+        "offer and mobile voucher characters decoded from the selected pose assets",
         "mobile voucher timer and code visible without scrolling",
         "public offer sharing",
         "immutable server-anchored countdown and reload",

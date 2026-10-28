@@ -4,13 +4,17 @@ Plan, 28. oktober 2026. Udarbejdet af Fable (`claude-fable-5-1`) i to gennemløb
 
 ## Leverancestatus
 
-**Implementeret nu:** de ni godkendte identiteter bruges som transparente udklip i finder, kategorier, stedvisning, tomme tilstande, tilbud, kuponer og invitationer. Mobilvisningen prioriterer kort, rute og invitation; tilbud og kuponer bruger kompakte karakteroversigter. Dansk er standard, og sprogskift DA/EN/SV huskes via en cookie på tværs af sider. Formularværdier, fejl og kuponens udløbstid bevares ved skift.
+**Implementeret nu:** datastyrede karakterer på forsiden, i tomme tilstande, tilbud, kuponer og invitationer; den sure skyfigur, regnposituren, cyklisten på cyklen og de to siddende øl-/cocktailpositurer. De originale situationstekster følger dansk, engelsk og svensk. Invitationer henter prognosen for deres faktiske tidspunkt; ja, måske og nej forbliver separate tal. Sprogskift og vejr ændrer ikke en eksisterende kupons udløb.
 
-**Planlagt her, endnu ikke implementeret:** den fulde datastyrede situationsmatrix, sur sky-positur, siddende øl-/cocktailfigurer, nye vejrrekvisitter og de originale humoristiske tekster nedenfor. Eksisterende stående figurer er fortsat i brug. Matrixen er et arbejdsgrundlag til næste redesign, ikke en beskrivelse af færdig funktionalitet. En regel skal samles ved sit eksisterende fælles kaldested; der skal kun indføres nye hjælpefunktioner, hvor en faktisk UI-flade har brug for dem.
+Kortet viser nu almindelige farver omkring bekræftede, åbne solsteder og dæmper resten i gråt. Farver kræver frisk solprognose, beregnet dagslys og bekræftet bygningssol. Skyer, regn, manglende/usikre data og ventende beregninger giver ingen fremhævning. Farvevinduerne viser kortkontekst omkring solpunkter, ikke en opmålt fysisk solgrænse. Dette er et supplerende brugerkrav fra samme chat, ikke et nyt Jurnie-krav.
+
+**Illustrationsleverance:** fem separate transparente, responsivt optimerede PNG-positurer. Bænken indgår i de to siddende figurers færdige kompositioner. Sol, sky, regn og måne genbruger de eksisterende native SVG-ikoner i separate dekorative lag. Det godkendte ni-personers papirark og galleriet er bevaret.
+
+**Senere arbejde:** pakken L1–L8 efter første brugertest, flere byer, nye drikketyper, push om kommende sol og mulighed for at foreslå et andet invitationstidspunkt. Disse udvidelser er ikke del af denne leverance.
 
 ## Kontekst
 
-Appen har kort, typerne park/bar/mad, tidspunkt, vejr fra MET Norway med flagene `weather.available` og `weather.stale`, beregnet solhøjde, beregnet bygningssol pr. sted, rutevejledning som åbner en gårute i Google Maps, invitation med svar ja/måske/nej, og Golden Hour-tilbud med `offer.kind` (beer/cocktail) og kupon. Serveren verificerer sol, vejr og åbent efter sin egen regel. Appen har ingen reverse-geocoder, ingen beregning af næste åbningstid og ingen egen rute-ETA. Ni karakterer er godkendt og vises gennem én fælles komponent. Denne plan giver hver figur en fast rolle pr. flade, binder al tekst til datafelter der findes, og bestiller de positurer der mangler. DA/EN/SV med husket valg er implementeret i arbejdstræet. Invitationssiden henter endnu ikke prognose for invitationens tidspunkt; række 19–20 kræver den kobling, før vejrbaseret tekst kan vises.
+Appen har kort, typerne park/bar/mad, tidspunkt, vejr fra MET Norway med flagene `weather.available` og `weather.stale`, beregnet solhøjde, beregnet bygningssol pr. sted, rutevejledning som åbner en gårute i Google Maps, invitation med svar ja/måske/nej, og Golden Hour-tilbud med `offer.kind` (beer/cocktail) og kupon. Serveren verificerer sol, vejr og åbent efter sin egen regel. Appen har ingen reverse-geocoder, ingen beregning af næste åbningstid og ingen egen rute-ETA. Ni karakterer er godkendt og vises gennem én fælles komponent. Implementeringen giver hver figur en fast rolle pr. flade og binder teksterne til tilgængelige datafelter. DA/EN/SV med husket valg er implementeret i arbejdstræet. Invitationssiden henter nu prognosen for invitationens tidspunkt; manglende, gamle eller udækkede data vises som usikre.
 
 ## 1. Kerneflow og de fem karakterøjeblikke
 
@@ -26,7 +30,7 @@ Karaktererne optræder fem steder. Kortet får ingen figur (J9).
 | 2 | Kupon | Gyldig, udløbet, indløst, eksempel, demo. | U3 |
 | 2 | Invitation | Send, svar, aflys. | J4 |
 
-A: Ingen figur i resultatlisten. Den store figur bor i hero og tilbudskort.
+Ingen stor situationsfigur i resultatlisten. Den store figur bor i hero og tilbudskort; små kategorimarkører bevares som dekoration.
 
 ## 2. Rollefordeling
 
@@ -68,8 +72,8 @@ Ni godkendte identiteter, ingen nye. Hver får ét fast ansvar.
 | 16 | Planlagt, gråt | valgt tidspunkt inden for prognosen, vejrtilstand cloud/rain | Planlægge | blue-shirt | "{date} {time} er gråt i udsigten. Prøv et andet tidspunkt." | Flyt tidspunkt | 2 |
 | 17 | Kør mig derhen | sted valgt, rute åbnes | Komme frem | cyclist, lille i hjørne | "Gåruten åbner i Google Maps. Solen venter ikke. Den har aldrig ventet." | Åbn rute | 2 |
 | 18 | Invitation oprettet | serveren har returneret en oprettet invitation med id | Samle venner | blue-coat + stripes, to små udklip | "Send den. Hvis ingen svarer, var det stedet. Helt sikkert stedet." | Del link | 1 |
-| 19 | Modtager åbner, sol i udsigt | A: invitation + ny prognosekobling med sun for tidspunktet | Svare | football | Se eksempel 9 | Ja / Måske / Nej | 1 |
-| 20 | Modtager åbner, gråt i udsigt | A: invitation + ny prognosekobling med cloud/rain for tidspunktet | Svare | blue-shirt | "Invitationen gælder stadig. Udsigten for {time} gør ikke. Svar alligevel." | Ja / Måske / Nej. A: "foreslå anden tid" senere | 2 |
+| 19 | Modtager åbner, sol i udsigt | invitation + prognosekobling med sun for tidspunktet | Svare | football | Se eksempel 9 | Ja / Måske / Nej | 1 |
+| 20 | Modtager åbner, gråt i udsigt | invitation + prognosekobling med cloud/rain for tidspunktet | Svare | blue-shirt | "Invitationen gælder stadig. Udsigten for {time} gør ikke. Svar alligevel." | Ja / Måske / Nej. A: "foreslå anden tid" senere | 2 |
 | 21 | Svar talt op | RSVP-liste | Se hvem der kommer | ét lille udklip pr. ja; måske og nej som tal | "{yesCount} ja. {maybeCount} måske. {noCount} nej. Måskerne bliver stående som måske." | Kør mig derhen | 2 |
 | 22 | Aflysning | vært annullerer | Aflyse | turtleneck | "Aflyst. Invitationen er opdateret, og alle ser det næste gang de åbner den." | Ny invitation | 2 |
 | 23 | Ingen aktiv Golden Hour | 0 aktive tilbud i udvalget | Se tilbud | ingen figur | "Ingen tilbud lige nu. Solen koster stadig ingenting." | Ingen | 2 |
@@ -187,7 +191,7 @@ Eksisterende stående udklip bruges uændret til green-jacket (1, 6, 7), curls (
 
 ### Mekanik (A under U4)
 
-Synlig native vælger med Dansk / English / Svenska i relevante sidehoveder og åbne dialoger. Valget gemmes i en valideret cookie, så første render rammer rigtigt. Den eksisterende fælles ordbog udvides med situationsnøgler; parallel lagring og en ny indstillingsside er ikke nødvendig. Datoer og tider går gennem Intl med da-DK, en-GB og sv-SE. Beløb formateres med Intl som valuta DKK: symbolvisning på dansk, anbefalet kodevisning på engelsk og svensk, med op til to decimaler så partnerens faktiske pris bevares. Rækkefølgen af tal og valuta accepteres som Intl leverer den. Anbefalingen til næste etape er at "DKK" står synligt i EN og SV, så en svensk læser ikke læser SEK. Delingstekster genereres i afsenderens sprog. Modtagerens side følger modtagerens valg. Afsenderens egen besked bevares som skrevet. Nuværende blandede svensk/dansk ryddes i samme ombæring.
+Synlig native vælger med Dansk / English / Svenska i relevante sidehoveder og åbne dialoger. Valget gemmes i en valideret cookie, så første render rammer rigtigt. Den eksisterende fælles ordbog udvides med situationsnøgler; parallel lagring og en ny indstillingsside er ikke nødvendig. Datoer og tider går gennem Intl med da-DK, en-GB og sv-SE. Beløb formateres med Intl som valuta DKK: symbolvisning på dansk, anbefalet kodevisning på engelsk og svensk, med op til to decimaler så partnerens faktiske pris bevares. Rækkefølgen af tal og valuta accepteres som Intl leverer den. "DKK" står synligt i EN og SV, så en svensk læser ikke læser SEK. Delingstekster genereres i afsenderens sprog. Modtagerens side følger modtagerens valg. Afsenderens egen besked bevares som skrevet. Nuværende blandede svensk/dansk ryddes i samme ombæring.
 
 ### Tone (U5)
 
@@ -212,14 +216,14 @@ Tørt, voksent, let pinligt. Vejret er en modstander med egen vilje. Brugerens s
 
 ### Rækkefølge
 
-Sprogskiftet i punkt 3 er allerede bygget; de øvrige trin er næste implementeringsetape.
+Punkt 1–6 er implementeret. Listen bevarer den besluttede leveringsrækkefølge; punkt 7 er den senere illustrationspakke.
 
 Ingen deployment, merge eller notifikationer indgår. Push om kommende sol (drøftet, ikke et bekræftet Jurnie-krav) og "foreslå anden tid" på invitation (#20) er senere arbejde og kræver funktioner der ikke findes.
 
 1. Fire valgfunktioner og opslagstabeller med én tabeltest pr. nøgle. Eksisterende udklip bruges midlertidigt.
-2. Startpakken bestilles samme dag som punkt 1 starter.
+2. Startpakken tegnes og integreres med de godkendte identiteter.
 3. Sprogordbog DA/EN/SV for alle nøgler, vælger, lagring, Intl-format og delingstekster. Blandet svensk/dansk fjernes.
-4. Hero og tomme tilstande (#1–14) med S3, S4, S5 og prop-lag når de lander.
+4. Hero og tomme tilstande (#1–14) med S3, S4, S5 og dekorative vejrlag.
 5. Tilbudskort og kupon (#23–32) med S1 og S2. Det lokale demo-partnerflow og eksemplets separate, ugyldige prøvekupon bevares.
 6. Invitation (#18–22).
 7. Senere pakke efter første brugertest.
@@ -236,7 +240,7 @@ Ingen deployment, merge eller notifikationer indgår. Push om kommende sol (drø
 | U3 | `offer.kind` beer giver puffer, cocktail giver blue-coat, andet giver ingen figur | Fixture-test på alle demo- og partnertilbud. 0 afvigelser. |
 | Kupon | Kuponkort uændret når hero skifter | Snapshot: samme kupon ved alle hero-tilstande giver identiske kupondata. |
 | Afvisning | Afvist claim viser serverens grund | Test: hver kendt grundkode giver sin tekst. Ukendt kode giver "Serveren sagde nej." |
-| Determinisme | Rene funktioner, én tabeltest pr. nøgle | 32 tilfælde, ét pr. række. Grep: samme eksplicitte input giver samme valg; aktuel tid leveres som input hvor den behøves. |
+| Determinisme | Rene funktioner, én tabeltest pr. nøgle | Matrixens vejr-, tom-, tilbuds-, kupon- og invitationstilstande kontrolleres med tabeltests og browserflows. Samme eksplicitte input giver samme valg; aktuel tid leveres som input hvor den behøves. |
 | Invitation | Aflysning opdaterer invitationen og sender intet | Test: aflys, modtager genindlæser, ser #22. 0 send-kald. |
 | RSVP | Tre tal svarer til listen | Test: 2 ja, 1 måske, 1 nej giver "2 ja. 1 måske. 1 nej." Måske tæller aldrig som nej. |
 | Demo | Lokal demo beholder testclaim og demokupon; simuleret eksempel beholder lokal prøveknap uden rigtigt claim | 2 tests, to forskellige mærker. |

@@ -1,6 +1,18 @@
 // Only render markers in the visible map. Stable world-grid cells keep groups
 // from jumping between buckets when the user pans.
 import { translate } from "./i18n.js";
+
+export function sunFocusPoints(places, results, { pending, weatherState, daylight }) {
+  if (pending || weatherState !== "sun" || !daylight) return [];
+  return places.flatMap((place) => {
+    const result = results[place.id];
+    if (result?.state !== "sun" || result.eligible !== true || result.opening?.state !== "open") return [];
+    const [lng, lat] = result.point || [place.lng, place.lat];
+    if (!Number.isFinite(lng) || !Number.isFinite(lat) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return [];
+    return [{ id: place.id, lat, lng }];
+  });
+}
+
 export function groupMapMarkers(
   items,
   { project, bounds, zoom, selectedId, cellSize = 76, language = "da" },

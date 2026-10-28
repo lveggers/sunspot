@@ -17,7 +17,8 @@
     "test:map": "node scripts/verify-map-performance.mjs",
     "test:golden-hour": "node scripts/verify-golden-hour.mjs",
     "test:identity": "node scripts/verify-visual-identity.mjs",
-    "test:language": "node scripts/verify-language.mjs"
+    "test:language": "node scripts/verify-language.mjs",
+    "test:experience": "node scripts/verify-character-experience.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

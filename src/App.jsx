@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Character, { categoryCharacters } from "./Character.jsx";
+import CharacterScene from "./CharacterScene.jsx";
+import { selectWeatherMoment, selectEmptyMoment } from "./characterExperience.js";
 import { LanguageSwitcher, useLanguage } from "./Language.jsx";
 import { localeFor } from "./i18n.js";
 import { useRouter } from "next/navigation";
@@ -173,7 +175,7 @@ function CreateForm({ place, date, hour, duration, onClose }) {
     <Modal title={t("finder.createTitle")} onClose={onClose}>
       <form className="create-form" onSubmit={submit}>
         <div className="plan-summary">
-          <Character character="blue-shirt" className="plan-character" />
+          <Character character="stripes" className="plan-character" />
           <div>
             <strong>{place.name}</strong>
             <p>{t(`flows.activity.${activityFor(place.category)}`)}</p>
@@ -259,6 +261,7 @@ export default function App() {
   const [fitResultsToken, setFitResultsToken] = useState(0);
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
+  const [weatherRevision, setWeatherRevision] = useState(0);
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(false);
   const [seatError, setSeatError] = useState("");
@@ -308,7 +311,7 @@ export default function App() {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [inviteId]);
+  }, [inviteId, weatherRevision]);
   useEffect(() => {
     return () => {
       locationRequest.current += 1;
@@ -351,16 +354,55 @@ export default function App() {
   const visiblePlaces = hasResults ? filtered.slice(0, 8) : [];
   const result = results[selected.id];
   const pending = solar.pending || weatherLoading;
-  const emptyMessage = !categories.length
-    ? t("finder.categoryRequired")
-    : solar.error
-      ? t("finder.shadowError")
-      : onlySun &&
-          SunCalc.getPosition(atHour(date, hour), 55.6865, 12.581).altitude <= 0
-        ? t("finder.night")
-        : onlySun && condition.state !== "sun"
-          ? t("finder.weatherEmpty", { condition: weatherConditionLabel(condition, language) })
-          : t("finder.noMatch");
+  const night = SunCalc.getPosition(atHour(date, hour), 55.6865, 12.581).altitude <= 0;
+  const sunPlaces = filtered.filter((place) => results[place.id]?.eligible && results[place.id]?.state === "sun");
+  const weatherMoment = selectWeatherMoment({
+    loading: pending || locating,
+    night,
+    available: Boolean(weather?.available && forecast),
+    stale: weather?.stale,
+    condition: condition.state,
+    hasSun: sunPlaces.length > 0,
+    planned: !live,
+  });
+  const withoutOpeningFilter = onlyOpen && !filtered.length && filterSpots(places, results, {
+    categories, query, district, onlySun, onlyOpen: false, origin,
+  });
+  const emptyMoment = selectEmptyMoment({
+    noTypes: !categories.length,
+    outsideCoverage: locationError === "finder.outsideCoverage",
+    locationError: locationError === "experience.empty.location.body",
+    unconfirmedOpen: Boolean(withoutOpeningFilter?.length),
+    weatherMoment,
+  });
+  const heroMoment = !categories.length || locationError === "finder.outsideCoverage" || locationError === "experience.empty.location.body"
+    ? emptyMoment : weatherMoment;
+  const momentParams = {
+    placeName: sunPlaces[0]?.name || t("finder.city"),
+    date: date === localDate() ? t("day.today") : dateLabel(atHour(date, 12), language),
+    time: clock(atHour(date, hour)),
+  };
+  const emptyMessage = solar.error ? t("finder.shadowError") : t(`experience.${emptyMoment.id}.body`, momentParams);
+
+  function experienceAction(moment) {
+    if (moment.id === "weather.loading" || moment.id === "weather.sun" || moment.id === "planned.sun") return null;
+    if (moment.id === "weather.night") return { label: "experience.action.tomorrow", run: () => {
+      setDate(days[1].value); setHour(12); setLive(false); setFinderOpen(true); setDetailOpen(false);
+    } };
+    if (["weather.missing", "weather.stale", "weather.unknown"].includes(moment.id)) return { label: "experience.action.refresh", run: () => {
+      setWeatherLoading(true); setWeatherRevision((value) => value + 1);
+    } };
+    if (moment.id === "empty.unconfirmed-open") return { label: "experience.action.unconfirmed", run: () => {
+      setOnlyOpen(false); setFitResultsToken((value) => value + 1);
+    } };
+    const later = ["weather.cloud", "weather.rain", "planned.grey"].includes(moment.id);
+    return { label: later ? "experience.action.later" : "experience.action.area", run: () => {
+      setFinderOpen(true); setFinderExpanded(true); setDetailOpen(false);
+      requestAnimationFrame(() => document.querySelector(later ? 'input[type="time"]' : '#district')?.focus());
+    } };
+  }
+  const heroAction = experienceAction(heroMoment);
+  const emptyAction = experienceAction(emptyMoment);
 
   const selectPlace = useCallback(
     (place) => {
@@ -430,11 +472,11 @@ export default function App() {
         setOrigin(point);
         setDistrict("");
       },
-      () => {
+      (error) => {
         if (request !== locationRequest.current) return;
         setLocating(false);
         setOrigin(null);
-        setLocationError("finder.locationFailed");
+        setLocationError(error.code === 1 ? "experience.empty.location.body" : "finder.locationFailed");
       },
       { timeout: 10000, maximumAge: 60000 },
     );
@@ -519,21 +561,15 @@ export default function App() {
               )}
               {finderOpen ? (
                 <form onSubmit={findSpots}>
-                  <div className="golden-hero paper-hero" lang={language}>
+                  <div className="golden-hero paper-hero experience-hero" lang={language} data-experience={heroMoment.id}>
                     <div>
                       <span className="paper-edition">{t("finder.edition")}</span>
-                      <h1>
-                        {t("finder.headline")}
-                        <br />
-                        <em>{t("finder.headlineSun")}</em>
-                      </h1>
-                      <p className="hero-invitation">{t("finder.company")}</p>
+                      <h1>{t(`experience.${heroMoment.id}.title`)}</h1>
+                      <p className="hero-invitation">{t(`experience.${heroMoment.id}.body`, momentParams)}</p>
+                      {heroMoment.id === "weather.night" && !weather?.available && <small>{t("experience.weatherStatusMissing")}</small>}
+                      {heroAction && <button type="button" className="experience-action" onClick={heroAction.run}>{t(heroAction.label)}</button>}
                     </div>
-                    <div className="hero-cast" aria-hidden="true">
-                      <Character character="blue-shirt" />
-                      <Character character="curls" />
-                      <Character character="turtleneck" />
-                    </div>
+                    <CharacterScene moment={heroMoment} className="hero-moment" />
                   </div>
                   <div className="finder-edit-row">
                     <button
@@ -568,7 +604,7 @@ export default function App() {
                     <span>·</span> {date === localDate() ? t("day.today") : dateLabel(atHour(date, 12), language)}{" "}
                     <span>·</span> {clock(atHour(date, hour))}
                   </div>
-                  {locationError && (
+                  {locationError && !["finder.outsideCoverage", "experience.empty.location.body"].includes(locationError) && (
                     <p className="finder-notice" role="status">
                       {errorText(locationError)}
                     </p>
@@ -706,7 +742,7 @@ export default function App() {
                   </button>
                 </form>
               ) : (
-                <div className="finder-summary">
+                <div className={`finder-summary ${!pending && !filtered.length ? "is-empty" : ""}`}>
                   <div className="finder-result-heading">
                     <div>
                       <h1>
@@ -714,7 +750,7 @@ export default function App() {
                           ? t("finder.resultSearching")
                           : filtered.length
                             ? t("finder.resultTitle")
-                            : t("finder.noMatchTitle")}
+                            : t(`experience.${emptyMoment.id}.title`)}
                       </h1>
                       <p>
                         {origin ? t("finder.near") : placeText({ district }, "district", language) || t("finder.city")} ·{" "}
@@ -727,10 +763,7 @@ export default function App() {
                         </strong>
                       )}
                     </div>
-                    <Character
-                      character={filtered.length ? "cyclist" : "green-jacket"}
-                      className="summary-character"
-                    />
+                    {!filtered.length && <CharacterScene moment={emptyMoment} className="summary-character" sizes="64px" />}
                   </div>
                   <div className="finder-summary-actions">
                     <button
@@ -762,9 +795,10 @@ export default function App() {
                     <div className="finder-language"><LanguageSwitcher /></div>
                   </div>
                   {!pending && !filtered.length && (
-                    <p className="finder-empty" role="status">
-                      {emptyMessage}
-                    </p>
+                    <div className="finder-empty" role="status" data-experience={emptyMoment.id}>
+                      <p>{emptyMessage}</p>
+                      {emptyAction && <button type="button" className="experience-action" onClick={emptyAction.run}>{t(emptyAction.label)}</button>}
+                    </div>
                   )}
                   {visiblePlaces.length > 0 && (
                     <section className="finder-place-preview" aria-label={t("finder.suggestions")} lang={language}>
@@ -814,6 +848,8 @@ export default function App() {
             </div>
             <MapView
               pending={solar.pending}
+              weatherState={weatherLoading ? "loading" : condition.state}
+              focusPlaces={filtered}
               categories={categories}
               focusResults={hasResults}
               fitResultsToken={fitResultsToken}
@@ -891,6 +927,10 @@ export default function App() {
                   </div>
                   <details className="place-more">
                     <summary>{t("finder.morePlace")}</summary>
+                    <div className="place-moment" data-experience="place.directions">
+                      <CharacterScene moment={{ id: "place.directions", character: "cyclist", pose: "cycling" }} sizes="56px" />
+                      <p>{t("experience.place.directions")}</p>
+                    </div>
                     <p className="detail-description">{placeText(selected, "description", language)}</p>
                     <p className="point-note">
                       {selected.category === "park"

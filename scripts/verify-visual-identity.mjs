@@ -12,6 +12,7 @@ const scenes = [
   ["Golden Hour", "golden-hour-friends.png"],
 ];
 const provenance = "EKSEMPEL · simuleret sol, vejr og tilbud";
+const poses = ["beer-seated", "cocktail-seated", "cloud-angry", "rain-bag", "cycling"];
 const browser = await chromium.launch({
   executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined,
 });
@@ -21,6 +22,20 @@ const context = await browser.newContext({
 });
 await context.addCookies([{ name: "sunspot-language", value: "da", url: base }]);
 const page = await context.newPage();
+await page.clock.setSystemTime(new Date("2026-10-28T11:00:00Z"));
+await context.route("**/api/weather", (route) => route.fulfill({
+  json: {
+    available: true,
+    stale: false,
+    timeseries: [{
+      time: "2026-10-28T11:00:00Z",
+      data: {
+        instant: { details: { air_temperature: 12, cloud_area_fraction: 100 } },
+        next_1_hours: { summary: { symbol_code: "cloudy" }, details: { precipitation_amount: 0 } },
+      },
+    }],
+  },
+}));
 const errors = [];
 const claimRequests = [];
 page.on("pageerror", (error) => errors.push(error.message));
@@ -172,6 +187,7 @@ try {
     "sunspot-friends-trio.png",
     "sunspot-complete-cast.png",
     "sunspot-cutout-cast.png",
+    ...poses.map((pose) => `poses/${pose}.png`),
   ]) {
     const response = await context.request.get(`${base}/illustrations/${file}`);
     assert.equal(response.status(), 200, `illustration ${file} is served`);
@@ -185,32 +201,36 @@ try {
       assert.equal(image.readUInt32BE(16), 1024, "the PNG atlas is 1024px wide");
       assert.equal(image.readUInt32BE(20), 1536, "the PNG atlas is 1536px high");
     }
-    if (file === "sunspot-cutout-cast.png") {
+    if (file === "sunspot-cutout-cast.png" || file.startsWith("poses/")) {
       const alpha = await sharp(image).extractChannel("alpha").raw().toBuffer();
       assert.ok(
         alpha.filter((value) => value === 0).length / alpha.length >= 0.25,
-        "the cutout atlas has a substantial fully transparent background",
+        `${file} has a substantial fully transparent background`,
       );
       assert.ok(
         alpha.filter((value) => value >= 250).length / alpha.length >= 0.1,
-        "the cutout atlas retains substantial opaque character artwork",
+        `${file} retains substantial opaque character artwork`,
       );
     }
   }
   await page.goto(base, { waitUntil: "domcontentloaded" });
   await page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
-  const heroCharacters = page.locator(".hero-cast .cast-character");
-  await expect(heroCharacters).toHaveCount(3);
+  const hero = page.locator('.experience-hero[data-experience="weather.cloud"]');
+  await expect(hero).toBeVisible();
+  const heroCharacters = hero.locator(".cast-character");
+  await expect(heroCharacters).toHaveCount(1);
   assert.deepEqual(
     await heroCharacters.evaluateAll((characters) =>
       characters.map((character) => [
         character.dataset.character,
-        Number(character.dataset.characterIndex),
+        character.dataset.pose,
       ]),
     ),
-    [["blue-shirt", 6], ["curls", 7], ["turtleneck", 8]],
-    "the hero shows the three distinct new characters",
+    [["blue-shirt", "cloud-angry"]],
+    "documented overcast weather selects the single angry blue-shirt character",
   );
+  await expect(hero.locator('.character-scene[data-moment="weather.cloud"]')).toHaveCount(1);
+  await expect(hero.locator(".character-weather-prop")).toHaveCount(1);
   for (const character of await heroCharacters.all()) {
     await expect(character).toHaveAttribute("aria-hidden", "true");
     assert.equal(
@@ -218,7 +238,7 @@ try {
       "none",
       "decorative characters do not intercept pointer input",
     );
-    await waitForIllustration(character.locator("img"), "sunspot-cutout-cast.png");
+    await waitForIllustration(character.locator("img"), "cloud-angry.png");
   }
   await assertSearchAccessible();
   await page.setViewportSize({ width: 1366, height: 768 });
@@ -316,7 +336,7 @@ try {
   await waitForIllustration(theatre().locator(".theatre-stage img"));
   await waitForIllustration(
     demo.locator(".theatre-example-picture img"),
-    "golden-hour-friends.png",
+    "beer-seated.png",
   );
   await page.screenshot({
     path: "artifacts/visual-identity-theatre-mobile.png",
@@ -350,8 +370,8 @@ try {
     JSON.stringify({
       passed: true,
       checks: [
-        "nine illustration assets including the paper and transparent character atlases",
-        "three decorative hero characters and an unobstructed search button",
+        "illustration assets including paper and transparent atlases and five transparent poses",
+        "one weather-driven hero character and an unobstructed search button",
         "nine named characters in exact atlas cells, three desktop and two mobile columns",
         "five accessible scenes",
         "keyboard scene navigation",

@@ -2,22 +2,24 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { mapColors } from "./theme.js";
 import { Plus, Minus, LocateFixed, Layers, Info } from "lucide-react";
-import { groupMapMarkers } from "./mapMarkers.js";
+import { groupMapMarkers, sunFocusPoints } from "./mapMarkers.js";
 import { atHour } from "./lib.js";
 import { useLanguage } from "./Language.jsx";
 
 import * as SunCalc from "suncalc";
-import BuildingShadowLayer from "./BuildingShadowLayer.js";
-import { hasParkArea, parkFocusLayer, fitParkView } from "./ParkFocusLayer.js";
-import { venueFocusLayer, fitPlacesView } from "./VenueFocusLayer.js";
+import { hasParkArea, fitParkView } from "./ParkFocusLayer.js";
+import { fitPlacesView } from "./VenueFocusLayer.js";
+import "./map-sun-focus.css";
 
 export default function MapView({
   pending = false,
+  weatherState = "unknown",
   categories = ["park", "bar", "restaurant"],
   focusResults = false,
   fitResultsToken = 0,
   viewReset = 0,
   places,
+  focusPlaces = places,
   selected,
   onSelect,
   date,
@@ -43,15 +45,17 @@ export default function MapView({
   const container = useRef(null),
     map = useRef(null),
     layer = useRef(null);
-  const shadowLayer = useRef(null);
+  const colorPane = useRef(null);
   const seatLayer = useRef(null);
   const markers = useRef(new Map());
   const lastPlaces = useRef([]);
   const fittedRequest = useRef({ fitResultsToken, viewReset });
   const [toolsOpen, setToolsOpen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
-  const [zones, setZones] = useState(true),
-    [tileError, setTileError] = useState(false);
+  const [tileError, setTileError] = useState(false);
+  const instant = atHour(date, hour);
+  const altitude = SunCalc.getPosition(instant, 55.6865, 12.581).altitude;
+  const daylight = altitude > 0;
   useEffect(() => {
     const m = L.map(container.current, {
       zoomControl: false,
@@ -69,6 +73,17 @@ export default function MapView({
     })
       .on("tileerror", () => setTileError(true))
       .addTo(m);
+    const pane = m.createPane("sunFocusColor");
+    pane.classList.add("sun-focus-color-pane");
+    pane.style.pointerEvents = "none";
+    pane.style.visibility = "hidden";
+    pane.style.clipPath = "inset(0 100% 100% 0)";
+    pane.dataset.activeCount = "0";
+    colorPane.current = pane;
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      pane: "sunFocusColor",
+      maxZoom: 19,
+    }).addTo(m);
     layer.current = L.layerGroup().addTo(m);
     seatLayer.current = L.layerGroup().addTo(m);
     const observer = new ResizeObserver(() => m.invalidateSize());
@@ -78,12 +93,14 @@ export default function MapView({
       m.remove();
       registry.clear();
       map.current = null;
+      colorPane.current = null;
     };
   }, []);
   useEffect(() => {
     if (!map.current) return;
     const m = map.current;
     const registry = markers.current;
+    const sunny = new Set(sunFocusPoints(focusPlaces, results, { pending, weatherState, daylight }).map((p) => p.id));
     if (!pending) lastPlaces.current = places;
     const update = () => {
       const zoom = m.getZoom();
@@ -117,6 +134,7 @@ export default function MapView({
       }
       for (const p of items) {
         const active = selected?.id === p.id;
+        const confirmedSun = p.members ? p.members.some((member) => sunny.has(member.id)) : sunny.has(p.id);
         const compact = !active && zoom < 16;
         let record = registry.get(p.markerId);
         if (!record) {
@@ -152,9 +170,9 @@ export default function MapView({
           registry.set(p.markerId, record);
         }
         record.item = p;
-        const signature = `${language}|${p.name}|${p.emoji}|${active}|${compact}|${results[p.id]?.state}|${p.members?.length}`;
+        const signature = `${language}|${p.name}|${p.emoji}|${active}|${compact}|${confirmedSun}|${p.members?.length}`;
         if (signature !== record.signature) {
-          record.button.className = `place-pin ${p.members ? "cluster-pin" : ""} ${active ? "active" : ""} ${results[p.id]?.state === "sun" ? "sunny" : ""} ${compact && !p.members ? "compact" : ""}`;
+          record.button.className = `place-pin ${p.members ? "cluster-pin" : ""} ${active ? "active" : ""} ${confirmedSun ? "sunny" : ""} ${compact && !p.members ? "compact" : ""}`;
           record.button.setAttribute(
             "aria-label",
             t(p.members ? "map.groupZoom" : "map.showPlace", { name: p.name }),
@@ -177,7 +195,7 @@ export default function MapView({
     update();
     m.on("moveend zoomend resize", update);
     return () => m.off("moveend zoomend resize", update);
-  }, [places, selected, results, onSelect, editing, pending, language, t]);
+  }, [places, focusPlaces, selected, results, onSelect, editing, pending, weatherState, daylight, language, t]);
   useEffect(() => {
     if (selected?.greenSpace && touchgrass && map.current) {
       fitParkView(map.current, places, selected.id);
@@ -222,39 +240,34 @@ export default function MapView({
     };
   }, [point, editing, selected, onPointChange, touchgrass]);
   useEffect(() => {
-    if (!buildings || !zones || !map.current) return;
-    const shadows = new BuildingShadowLayer(
-      buildings,
-      atHour(date, hour),
-    ).addTo(map.current);
-    shadowLayer.current = shadows;
-    return () => {
-      shadows.remove();
-      shadowLayer.current = null;
+    if (!map.current || !colorPane.current) return;
+    const m = map.current;
+    const pane = colorPane.current;
+    const points = sunFocusPoints(focusPlaces, results, { pending, weatherState, daylight });
+    const update = () => {
+      // Screen-space windows reveal place context, not measured sunlight boundaries.
+      const radius = 54;
+      pane.style.width = `${m.getSize().x}px`;
+      pane.style.height = `${m.getSize().y}px`;
+      const path = points.map(({ lat, lng }) => {
+        const p = m.latLngToLayerPoint([lat, lng]);
+        return `M${p.x - radius},${p.y}a${radius},${radius} 0 1,0 ${radius * 2},0a${radius},${radius} 0 1,0 ${-radius * 2},0Z`;
+      }).join(" ");
+      pane.style.clipPath = path ? `path('${path}')` : "inset(0 100% 100% 0)";
+      pane.style.visibility = points.length ? "" : "hidden";
+      pane.dataset.activeCount = String(points.length);
+      pane.dataset.weatherState = weatherState;
+      pane.dataset.zoom = String(m.getZoom());
     };
-    // Time changes update the existing layer, preserving its projection cache.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildings, zones]);
-  useEffect(() => {
-    shadowLayer.current?.setInstant(atHour(date, hour));
-  }, [date, hour]);
-  useEffect(() => {
-    if (!touchgrass || editing || !map.current) return;
-    const focus = parkFocusLayer(
-      map.current,
-      places,
-      selected?.id,
-      onSelect,
-    ).addTo(map.current);
-    return () => focus.remove();
-  }, [touchgrass, editing, places, selected?.id, onSelect]);
-  useEffect(() => {
-    if (!venueFocus || editing || !map.current) return;
-    const focus = venueFocusLayer(map.current, places, results).addTo(
-      map.current,
-    );
-    return () => focus.remove();
-  }, [venueFocus, editing, places, results]);
+    const hide = () => { pane.style.visibility = "hidden"; };
+    update();
+    m.on("moveend zoomend resize viewreset", update);
+    m.on("zoomstart", hide);
+    return () => {
+      m.off("moveend zoomend resize viewreset", update);
+      m.off("zoomstart", hide);
+    };
+  }, [focusPlaces, results, pending, weatherState, daylight]);
   useEffect(() => {
     if (!map.current || pending) return;
     const previous = fittedRequest.current;
@@ -267,18 +280,15 @@ export default function MapView({
     if (touchgrass) fitParkView(map.current, places);
     else fitPlacesView(map.current, places);
   }, [fitResultsToken, viewReset, pending, places, touchgrass]);
-  const altitude = SunCalc.getPosition(
-    atHour(date, hour),
-    55.6865,
-    12.581,
-  ).altitude;
   return (
     <section
       className={`map-shell ${editing ? "editing" : ""} ${touchgrass ? "touchgrass" : ""} ${venueFocus ? "venue-focus" : ""}`}
       data-categories={categories.join(" ")}
+      data-instant={instant.toISOString()}
+      data-daylight={daylight}
       aria-label={t("map.region")}
     >
-      <div ref={container} className="map" />
+      <div ref={container} className="map sun-focus-map" data-sun-focus-enabled={!pending && weatherState === "sun" && daylight} />
       <button
         className="map-tools-toggle"
         aria-label={t("map.tools")}
@@ -308,14 +318,6 @@ export default function MapView({
         </div>
         <div className="map-layer-controls">
           <button
-            className={zones ? "on" : ""}
-            onClick={() => setZones(!zones)}
-            aria-label={t("map.buildingShadows")}
-            aria-pressed={zones}
-          >
-            <Layers size={17} /> {t("map.shadows")}
-          </button>
-          <button
             aria-label={t("map.about")}
             aria-expanded={legendOpen}
             onClick={() => setLegendOpen((open) => !open)}
@@ -324,7 +326,7 @@ export default function MapView({
           </button>
         </div>
       </div>
-      {zones && (legendOpen || dataError) && (
+      {(legendOpen || dataError) && (
         <div className="zone-note shadow-legend" role="status">
           {dataError ? (
             <>
@@ -336,26 +338,16 @@ export default function MapView({
           ) : (
             <>
               <strong>
-                <i className="shadow-swatch" />
+                <i className="sun-focus-swatch" />
                 {altitude <= 0
                   ? t("map.sunBelow")
                   : altitude < 5
                     ? t("map.sunLow")
-                    : t("map.darkMeansShadow")}
+                    : t("map.sunFocusTitle")}
               </strong>
-              {touchgrass && (
-                <span>
-                  <i className="park-swatch" />
-                  {t("map.greenMeansPark")}
-                </span>
-              )}
+              <span>{t("map.sunFocusConditions")}</span>
+              <span>{t("map.sunFocusContext")}</span>
               <span>{t("map.heightsNote")}</span>
-              {altitude > 0 && (
-                <span>
-                  <i className="coverage-swatch" />
-                  {t("map.outsideCoverage")}
-                </span>
-              )}
               <span>{t("map.changeTime")}</span>
             </>
           )}

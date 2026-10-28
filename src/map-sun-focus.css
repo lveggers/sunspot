@@ -1,0 +1,21 @@
+.sun-focus-map .leaflet-tile-pane {
+  filter: grayscale(1) brightness(1.08) contrast(0.78);
+  opacity: 0.42;
+}
+.sun-focus-map .sun-focus-color-pane {
+  z-index: 250;
+  pointer-events: none;
+}
+.sun-focus-map .sun-focus-color-pane .leaflet-tile-container {
+  pointer-events: none;
+}
+.sun-focus-map[data-sun-focus-enabled="false"] .sun-focus-color-pane {
+  visibility: hidden !important;
+}
+.sun-focus-swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #496c57;
+  border-radius: 50%;
+  background: #9aaa87;
+}
