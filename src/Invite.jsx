@@ -30,6 +30,11 @@ export default function Invite({ id }) {
     () => saved(`rsvp:${id}`)?.answer || "yes",
   );
   const [sent, setSent] = useState(false);
+  const [responseConfirmation, setResponseConfirmation] = useState(0);
+  const [createdNow] = useState(() => {
+    try { return sessionStorage.getItem(`sunspot:created-invite:${id}`) === "1"; }
+    catch { return false; }
+  });
   const [weatherSnapshot, setWeatherSnapshot] = useState(null);
   const hostToken = saved(`host:${id}`);
   const startsAt = g?.startsAt;
@@ -44,9 +49,11 @@ export default function Invite({ id }) {
           if (signal?.aborted) return;
           setG(data);
           setError("");
+          return data;
         })
         .catch((error) => {
           if (!signal?.aborted) setError(error);
+          return null;
         }),
     [id, hostToken],
   );
@@ -55,6 +62,11 @@ export default function Invite({ id }) {
     load(controller.signal);
     return () => controller.abort();
   }, [load]);
+  useEffect(() => {
+    if (!createdNow) return;
+    try { sessionStorage.removeItem(`sunspot:created-invite:${id}`); }
+    catch { /* Optional animation handoff may be unavailable. */ }
+  }, [createdNow, id]);
   useEffect(() => {
     if (!startsAt || !active) return;
     let controller;
@@ -100,8 +112,10 @@ export default function Invite({ id }) {
         throw new Error(
           "flows.invite.storage",
         );
-      await load();
+      const refreshed = await load();
+      if (!refreshed) return;
       setSent(true);
+      setResponseConfirmation((value) => value + 1);
     } catch (e) {
       setError(e);
     } finally {
@@ -178,8 +192,14 @@ export default function Invite({ id }) {
                 </p>
               </div>
               <div className="invite-cast">
-                <CharacterScene moment={moment} />
-                {situation === "created" && <CharacterScene moment={{ ...moment, character: "stripes" }} />}
+                <CharacterScene
+                  moment={moment}
+                  animate
+                  companion={situation === "created" ? "stripes" : undefined}
+                  confirmation={responseConfirmation > 0
+                    ? `rsvp:${responseConfirmation}`
+                    : situation === "created" && createdNow ? `created:${id}` : undefined}
+                />
               </div>
             </div>
             <p className="invite-moment-copy" data-invitation-state={moment.id}>

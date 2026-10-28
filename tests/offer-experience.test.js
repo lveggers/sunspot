@@ -5,7 +5,18 @@ import {
   selectExampleMoment,
   selectOfferMoment,
   selectVoucherMoment,
+  redeemedVoucherConfirmation,
 } from "../src/offerExperience.js";
+
+test("redemption receipt requires a transition on the same already observed voucher", () => {
+  const valid = { id: "voucher", redeemedAt: null };
+  const redeemed = { ...valid, redeemedAt: "2026-10-28T12:00:00Z" };
+  assert.equal(redeemedVoucherConfirmation(null, redeemed), undefined);
+  assert.equal(redeemedVoucherConfirmation(valid, redeemed), "redeemed:voucher:2026-10-28T12:00:00Z");
+  assert.equal(redeemedVoucherConfirmation(redeemed, redeemed), undefined);
+  assert.equal(redeemedVoucherConfirmation({ ...valid, id: "other" }, redeemed), undefined);
+  assert.equal(redeemedVoucherConfirmation(valid, valid), undefined);
+});
 import messages from "../src/locales/offerExperience.js";
 
 const offer = Object.freeze({ kind: "beer", claimable: true, state: "active" });

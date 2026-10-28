@@ -1,12 +1,21 @@
 # SunSpot — animationsplan
 
-Udarbejdet med Astra (`gpt-6-astra`), 28. oktober 2026. **Kun planlagt; ingen animationer er implementeret med dette dokument.** Karakteridentiteterne og papir-/blækstilen bevares. Bevægelse skal gøre tilstandsskift lettere at se. Tekst er neutral og konkret; figurerne skal ikke irettesætte brugeren eller spille komiske reaktioner.
+Udarbejdet med Astra (`gpt-6-astra`), 28. oktober 2026. **Den anbefalede første leverance er implementeret med Astra.** Karakteridentiteterne og papir-/blækstilen bevares. Bevægelse skal gøre tilstandsskift lettere at se. Tekst er neutral og konkret; figurerne skal ikke irettesætte brugeren eller spille komiske reaktioner.
 
-## Anbefalet første leverance
+## Implementeret første leverance
 
-Implementér korte indgange og skift i den primære karakterscene, en begrænset loadingbevægelse og diskret kvittering efter bekræftet claim/RSVP. Brug eksisterende PNG'er, vejrikoner, CSS og browserens animations-API til afbrydelse. Hold kortets farveskift øjeblikkelige i første leverance. Ingen ny dependency eller illustrationsbestilling er nødvendig.
+Den primære karakterscene har korte indgange og tilstandsskift, en begrænset loadingbevægelse og diskret kvittering efter bekræftet claim/RSVP. Implementeringen bruger eksisterende PNG'er, vejrikoner, CSS-layout og native Web Animations API. Kortets farveskift er fortsat øjeblikkelige. Der er ingen ny dependency eller illustrationsbestilling.
 
 Alle scener skal ende i ro senest 3,6 sekunder efter start. CTA, fejl, datastatus, kuponkode og timer er synlige og opdateres med det samme. Animation er aldrig en betingelse for at fortsætte. Ingen nye obligatoriske godkendelsestrin indgår.
+
+## Integrationsregler i den færdige kode
+
+- `CharacterScene` er statisk som standard. Kun primære flader får `animate`; lister, kategorier og deltagerudklip bevarer ro. Invitationsparret bruger én fælles wrapper.
+- En kort indlæsningssekvens genbruger samme native animationshandle gennem Reacts udviklingsprobe. Faktiske inputs ændrer eller afbryder bevægelsen; skjult dokument, reduceret bevægelse, offscreen og overliggende dialog stopper den uden genstart ved retur.
+- Nye claims kvitterer kun ved HTTP 201. HTTP 200 betyder en allerede eksisterende kupon og giver ingen ny succes. GET-genåbning etablerer kun baseline; en senere observeret redeemedAt-overgang på samme id kan kvitteres én gang.
+- Kuponuret resyncer sit monotone anker ved nye serverNow-data uden at remounte scene eller kodefelt. Kuponens id er den stabile nøgle; koden bevarer fokus og markering under polling.
+- RSVP-kvittering kræver både accepteret POST og vellykket genhentning. Ny invitation bruger en engangsmarkør i sessionStorage til den aktuelle navigation; markøren er ude af URL, delingslink og permanent host-storage. Blokeret lager springer kun den dekorative indgang over.
+- Neutral tekst, sol-/vejrgates, serverens kuponregler og kortets øjeblikkelige farvefokus er bevaret.
 
 ## Faktisk grundlag og grænser
 
@@ -96,7 +105,7 @@ Bestil kun de segmenter, der svarer til en konkret valgt bevægelse. De er ikke 
 
 Hold ændringen i `CharacterScene.jsx` og de tilhørende CSS-filer, med små eksplicitte signaler fra `App.jsx`, `GoldenHour.jsx` og `Invite.jsx`, hvor en bekræftet brugerhandling skal skelnes fra genåbning. Tilføj ikke en generisk animationsmotor. Galleriet, kategorimarkørerne, kortet og RSVP-rækken er statiske. Læs de relevante lokalt installerede Next-guides før implementering, som repoets `AGENTS.md` kræver.
 
-Genbrug de eksisterende selector-tests og `scripts/verify-character-experience.mjs`. Browserchecket bruger i dag kun reduced motion; tilføj en målrettet normal-motion-kontekst til samme check. Kør tests i projektets eksisterende Docker-stack med syntetiske data. Denne planfil alene kræver ingen ny runtime eller testkørsel.
+De eksisterende selector-tests suppleres af `tests/character-motion.test.js`. `scripts/verify-character-experience.mjs` kontrollerer reduced motion og kalder `verify-character-motion.mjs` for normal bevægelse, native handles, timing, afbrydelse og flowkvitteringer. Verifikationen køres i projektets Docker-stack med syntetiske data.
 
 | Kontrol | Bestået når |
 |---|---|

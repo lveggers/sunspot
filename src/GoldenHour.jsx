@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { GoldenHourExample } from "./BrandTheatre.jsx";
 import CharacterScene from "./CharacterScene.jsx";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -23,6 +23,7 @@ import {
   formatOfferPrice as money,
   selectOfferMoment,
   selectVoucherMoment,
+  redeemedVoucherConfirmation,
 } from "./offerExperience.js";
 import "./offer-experience.css";
 
@@ -80,29 +81,30 @@ function PublicShare({ offer }) {
 }
 
 function VoucherClock({ expiresAt, serverNow, children }) {
-  const [anchor] = useState(() => performance.now());
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(
-      () => setElapsed(performance.now() - anchor),
-      1000,
-    );
-    return () => clearInterval(timer);
-  }, [anchor]);
-  const remaining = Math.max(
-    0,
-    Date.parse(expiresAt) - Date.parse(serverNow) - elapsed,
+  const [remaining, setRemaining] = useState(() =>
+    Math.max(0, Date.parse(expiresAt) - Date.parse(serverNow)),
   );
+  useLayoutEffect(() => {
+    const anchor = performance.now();
+    const update = () => setRemaining(Math.max(
+      0,
+      Date.parse(expiresAt) - Date.parse(serverNow) - (performance.now() - anchor),
+    ));
+    // Resync the external clock before paint without remounting the voucher or its focused code.
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt, serverNow]);
   const seconds = Math.ceil(remaining / 1000);
   const label = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   return children({ remaining, label });
 }
 
-function VoucherCard({ voucher, serverNow }) {
+function VoucherCard({ voucher, serverNow, confirmation }) {
   const { language, t } = useLanguage();
   return (
     <VoucherClock
-      key={`${voucher.id}:${serverNow}`}
+      key={voucher.id}
       expiresAt={voucher.expiresAt}
       serverNow={serverNow}
     >
@@ -129,6 +131,8 @@ function VoucherCard({ voucher, serverNow }) {
               </div>
               <CharacterScene
                 moment={moment}
+                animate
+                confirmation={confirmation}
                 className="offer-experience-character"
                 sizes="100px"
               />
@@ -190,6 +194,8 @@ function OfferDetail({ id }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [claimRejected, setClaimRejected] = useState(false);
+  const [voucherConfirmation, setVoucherConfirmation] = useState(undefined);
+  const observedVoucher = useRef(null);
   useEffect(() => {
     let controller;
     const refresh = () => {
@@ -215,7 +221,12 @@ function OfferDetail({ id }) {
           signal: request.signal,
         })
           .then((value) => {
-            if (!request.signal.aborted) setCoupon(value);
+            if (!request.signal.aborted) {
+              // Only an observed redemption transition carries a receipt.
+              setVoucherConfirmation(redeemedVoucherConfirmation(observedVoucher.current, value.voucher));
+              observedVoucher.current = value.voucher;
+              setCoupon(value);
+            }
           })
           .catch(() => {
             /* The visitor can retry the original claim without extending it. */
@@ -238,10 +249,13 @@ function OfferDetail({ id }) {
     setError("");
     setClaimRejected(false);
     try {
-      const value = await api(
+      const response = await api(
         `/golden-hour/offers/${encodeURIComponent(id)}/claim`,
-        { method: "POST" },
+        { method: "POST", withStatus: true },
       );
+      const value = response.data;
+      setVoucherConfirmation(response.status === 201 ? `claim:${value.voucher.id}` : undefined);
+      observedVoucher.current = value.voucher;
       setCoupon(value);
       if (!save(`golden-voucher:${id}`, value.voucher.id))
         setError(
@@ -257,7 +271,11 @@ function OfferDetail({ id }) {
   if (coupon)
     return (
       <>
-        <VoucherCard voucher={coupon.voucher} serverNow={coupon.serverNow} />
+        <VoucherCard
+          voucher={coupon.voucher}
+          serverNow={coupon.serverNow}
+          confirmation={voucherConfirmation}
+        />
         {error && (
           <p className="error" role="alert">
             {errorText(error)}
@@ -293,6 +311,7 @@ function OfferDetail({ id }) {
         </div>
         <CharacterScene
           moment={moment}
+          animate
           className="offer-experience-character"
           sizes="100px"
         />
@@ -514,6 +533,8 @@ export function GoldenVoucherPage({ id }) {
   const { t, errorText } = useLanguage();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [confirmation, setConfirmation] = useState(undefined);
+  const observedVoucher = useRef(null);
   useEffect(() => {
     let controller;
     const refresh = () => {
@@ -525,6 +546,8 @@ export function GoldenVoucherPage({ id }) {
       })
         .then((value) => {
           if (!request.signal.aborted) {
+            setConfirmation(redeemedVoucherConfirmation(observedVoucher.current, value.voucher));
+            observedVoucher.current = value.voucher;
             setData(value);
             setError("");
           }
@@ -559,7 +582,11 @@ export function GoldenVoucherPage({ id }) {
       <LanguageSwitcher />
       <div className="golden-standalone-card">
         {data ? (
-          <VoucherCard voucher={data.voucher} serverNow={data.serverNow} />
+          <VoucherCard
+            voucher={data.voucher}
+            serverNow={data.serverNow}
+            confirmation={confirmation}
+          />
         ) : (
           <p role={error ? "alert" : "status"}>{error ? errorText(error) : t("flows.voucher.loading")}</p>
         )}

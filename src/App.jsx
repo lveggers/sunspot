@@ -165,6 +165,11 @@ function CreateForm({ place, date, hour, duration, onClose }) {
         setBusy(false);
         return;
       }
+      try {
+        sessionStorage.setItem(`sunspot:created-invite:${created.id}`, "1");
+      } catch {
+        // Creation succeeds even when optional animation handoff storage is blocked.
+      }
       router.push(`/invite/${created.id}`);
     } catch (e) {
       setError(e);
@@ -569,7 +574,7 @@ export default function App() {
                       {heroMoment.id === "weather.night" && !weather?.available && <small>{t("experience.weatherStatusMissing")}</small>}
                       {heroAction && <button type="button" className="experience-action" onClick={heroAction.run}>{t(heroAction.label)}</button>}
                     </div>
-                    <CharacterScene moment={heroMoment} className="hero-moment" />
+                    <CharacterScene moment={heroMoment} className="hero-moment" animate={!modal} />
                   </div>
                   <div className="finder-edit-row">
                     <button

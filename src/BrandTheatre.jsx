@@ -223,6 +223,8 @@ function ExampleTicket({ startedAt }) {
       <span className="theatre-demo-mark">{t("theatre.exampleTicket")}</span>
       <CharacterScene
         moment={moment}
+        animate
+        confirmation={`example:${startedAt}`}
         className="offer-experience-example-character"
         sizes="80px"
       />

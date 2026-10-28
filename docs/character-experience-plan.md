@@ -2,7 +2,7 @@
 
 Opdateret 28. oktober 2026. Den oprindelige situations- og illustrationsplan blev udarbejdet med Fable. Brugerens seneste instruktion erstatter den tidligere humoristiske tekstretning: al apptekst skal nu være kort, neutral og hjælpsom. Karakterernes identiteter og udtryk bevares.
 
-Kildekravene findes i [Jurnie-kravene](jurnie-requirements-2026-10-26.md). Astra planlægger bevægelse separat i [animationsplanen](character-animation-plan.md); denne tekstopdatering implementerer ikke nye animationer.
+Kildekravene findes i [Jurnie-kravene](jurnie-requirements-2026-10-26.md). Astra har implementeret den første bevægelsesleverance beskrevet i [animationsplanen](character-animation-plan.md).
 
 ## Implementeret
 
@@ -79,4 +79,4 @@ Sprogvalget gemmes i en valideret cookie. Datoer og beløb bruger Intl; Københa
 
 Eksisterende native tests og browserforløb kontrollerer datagrænser, alpha/crops, ni-personers galleri, mobile primærhandlinger, kortzoom og farvefokus, kuponur, invitation/RSVP/aflysning og de tre sprog. Tekstændringer skal også kontrolleres for mobiloverløb.
 
-Animationsplanen er en plan, ikke en implementeret bevægelsesleverance. Senere illustrationsvarianter (tomme glas, skålende positurer, tommel op, aflysningsskilt og ekstra pege-/skuldertræk) kræver fortsat en konkret bestilling. Flere byer, nye drikketyper, push om kommende sol og forslag til alternativ invitationstid er ikke del af den aktuelle app.
+Korte primærscene-animationer og bekræftede kvitteringer er implementeret med Astra; ingen kontinuerlige idleloops er tilføjet. Senere illustrationsvarianter (tomme glas, skålende positurer, tommel op, aflysningsskilt og ekstra pege-/skuldertræk) kræver fortsat en konkret bestilling. Flere byer, nye drikketyper, push om kommende sol og forslag til alternativ invitationstid er ikke del af den aktuelle app.

@@ -46,6 +46,10 @@ excluded from Git.
 - Weather-driven characters react to clouds, rain, night and uncertain data;
   seated beer/cocktail characters follow the actual partner offer. Confirmed
   sunny, open places stand out in color against a faded grey map.
+- Finite character animations on primary screens, with reduced-motion support.
+  Loading stops after three pulses; claim and RSVP receipts follow confirmed
+  actions without resetting voucher timers or replaying on language changes.
+  [Animation rules and implementation](docs/character-animation-plan.md).
 - A remembered Danish, English or Swedish interface, including map controls,
   partner offers, vouchers and invitations.
 - An area, day and time finder, starting at the current Copenhagen time.
@@ -105,7 +109,7 @@ npm run test:map         # grouping, mobile layout, worker/fallback and responsi
 npm run test:golden-hour # offer/partner UI, sharing and server-anchored voucher states
 npm run test:identity    # artwork, scene controls, mock labels and mobile map access
 npm run test:language    # DA/EN/SV, navigation, form state and coupon timing
-npm run test:experience  # weather/permission moments and mobile CTA visibility
+npm run test:experience  # weather/permission moments, mobile CTA and native motion lifecycle
 ```
 
 For browser tests, install Chromium with `npx playwright install chromium`,

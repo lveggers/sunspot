@@ -6,7 +6,11 @@
   isolation: isolate;
   pointer-events: none;
 }
-.character-scene > .cast-character { width: 100%; }
+.character-motion-group { display: block; width: 100%; }
+.character-motion-group > .cast-character { width: 100%; }
+.scene-companions .character-motion-group { display: flex; align-items: end; }
+.scene-companions .character-motion-group > .cast-character { width: 50%; flex: 0 0 50%; }
+.invite-cast > .character-scene.scene-companions { width: 100%; flex-basis: 100%; }
 .character-weather-prop {
   position: absolute;
   z-index: -1;

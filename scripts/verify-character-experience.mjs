@@ -1,6 +1,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { verifyCharacterMotion } from './verify-character-motion.mjs';
 
 const base = process.env.SUNSPOT_URL || 'http://localhost:3000';
 const browser = await chromium.launch({ executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined });
@@ -29,6 +30,7 @@ await context.route('**/api/golden-hour/offers', route => route.fulfill({ json: 
 const checks = [];
 async function assertMoment(id, { ready = true } = {}) {
   await expect(page.locator(`.experience-hero[data-experience="${id}"]`)).toBeVisible();
+  assert.equal(await page.locator('.experience-hero .character-scene').evaluate((scene) => scene.getAnimations({ subtree: true }).length), 0, `${id}: reduced motion starts no native animation`);
   const submit = page.locator('.finder-submit');
   if (ready) await expect(submit).toBeEnabled();
   await expect(submit).toBeInViewport({ ratio: 1 });
@@ -100,7 +102,9 @@ try {
     await page.screenshot({ path: `artifacts/experience-cloud-${language}-mobile.png` });
   }
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ passed: true, viewport: '360×640', checks, facts: ['main CTA visible and unobstructed', 'weather gates color focus', 'no types stays empty', 'denied/outside location stays honest', 'locale changes preserve moment'] }));
+  await context.close();
+  const motionChecks = await verifyCharacterMotion(browser, base);
+  console.log(JSON.stringify({ passed: true, viewport: '360×640', checks, motionChecks, facts: ['main CTA visible and unobstructed', 'weather gates color focus', 'no types stays empty', 'denied/outside location stays honest', 'locale changes preserve moment'] }));
 } finally {
   releaseWeather?.();
   await browser.close();

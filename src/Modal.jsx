@@ -1,18 +1,20 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { LanguageSwitcher, useLanguage } from "./Language.jsx";
 
 export default function Modal({ title, children, onClose, className = "" }) {
   const { t } = useLanguage();
   const ref = useRef(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const d = ref.current;
     const opener = document.activeElement;
     d.showModal();
+    document.dispatchEvent(new Event("sunspot:modalchange"));
     return () => {
       d.close();
+      document.dispatchEvent(new Event("sunspot:modalchange"));
       if (opener instanceof HTMLElement && opener.isConnected)
         opener.focus({ preventScroll: true });
     };
