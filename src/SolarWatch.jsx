@@ -5,7 +5,6 @@ import { recommendNext } from "./exposure.js";
 import { clock, durationLabel, openingLabel } from "./lib.js";
 import { translate } from "./i18n.js";
 import { useLanguage } from "./Language.jsx";
-import CharacterScene from "./CharacterScene.jsx";
 export function solarLabel(result, language = "da") {
   if (!result) return translate(language, "solar.missing");
   if (!result.eligible) return translate(language, "solar.noOutdoor");
@@ -93,7 +92,6 @@ export default function SolarWatch({
       id="sun-watch"
       aria-label={t("watch.region")}
     >
-      {warning && <CharacterScene moment={{ id: "place.shade-soon", character: "cyclist", pose: "cycling" }} className="watch-character" sizes="56px" />}
       <div className="watch-heading">
         <Bell size={18} />
         <strong>

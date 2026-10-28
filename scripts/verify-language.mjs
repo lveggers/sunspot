@@ -2,6 +2,7 @@ import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { formatOfferPrice } from "../src/offerExperience.js";
+import { assertCharacterScope } from "./verify-character-motion.mjs";
 
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const copy = {
@@ -9,16 +10,19 @@ const copy = {
     language: "Sprog", find: "Find min plads i solen", near: "Nær mig", today: "I dag",
     claim: "Hent min kupon · 1 time", code: "Kuponkode", locale: "da-DK",
     locationError: "Vælg et område manuelt, eller tillad adgang til din position.",
+    openFields: "Vælg sted og tid",
   },
   en: {
     language: "Language", find: "Find my spot in the sun", near: "Near me", today: "Today",
     claim: "Get my voucher · 1 hour", code: "Voucher code", locale: "en-GB",
     locationError: "Choose an area manually or allow access to your location.",
+    openFields: "Choose place and time",
   },
   sv: {
     language: "Språk", find: "Hitta min plats i solen", near: "Nära mig", today: "Idag",
     claim: "Hämta min kupong · 1 timme", code: "Kupongkod", locale: "sv-SE",
     locationError: "Välj ett område manuellt eller tillåt åtkomst till din plats.",
+    openFields: "Välj plats och tid",
   },
 };
 const browser = await chromium.launch({ executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined });
@@ -107,7 +111,8 @@ const setLanguage = async (language) => {
 };
 const assertFinderCopy = async (language) => {
   await expect(page.locator(".finder-submit")).toHaveAccessibleName(copy[language].find);
-  await expect(page.locator(".nearby-button")).toHaveAccessibleName(copy[language].near);
+  if (await page.locator(".nearby-button").isVisible()) await expect(page.locator(".nearby-button")).toHaveAccessibleName(copy[language].near);
+  else await expect(page.locator(".finder-toggle")).toHaveAccessibleName(copy[language].openFields);
   await expect(page.locator(".finder-date-time select option").first()).toContainText(copy[language].today);
 };
 const finderValues = () => page.evaluate(() => ({
@@ -135,12 +140,13 @@ try {
   await expect(await languageSelect()).toHaveAccessibleName("Sprog");
   assert.deepEqual(await (await languageSelect()).locator("option").evaluateAll((options) => options.map((option) => [option.value, option.textContent])), [["da", "Dansk"], ["en", "English"], ["sv", "Svenska"]]);
   await assertFinderCopy("da");
+  await page.locator(".finder-toggle").click();
   await page.locator("#district").selectOption("Nørrebro");
   await page.locator(".finder-date-time select").selectOption("2026-10-29");
   await page.locator('input[type="time"]').fill("13:15");
   await page.locator('.finder-types [data-category="restaurant"]').click();
   await page.locator(".nearby-button").click();
-  const locationNotice = page.locator('.experience-hero[data-experience="empty.location"] .hero-invitation');
+  const locationNotice = page.locator('.finder-notice[data-reason="empty.location"]');
   await expect(locationNotice).toHaveText(copy.da.locationError);
   const values = await finderValues();
   for (const language of ["en", "sv"]) {
@@ -158,6 +164,7 @@ try {
   await page.goto(`${base}/?offer=${offer.id}`, { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("lang", "sv");
   await expect(page.locator(".golden-price")).toHaveText(money("sv"));
+  await expect(page.locator(".golden-offer-detail .cast-character")).toHaveCount(0);
   await setLanguage("en");
   await expect(page.locator(".golden-price")).toHaveText(money("en"));
   await setLanguage("da");
@@ -171,6 +178,7 @@ try {
   assert.equal(mutations.claims, 1);
   await setLanguage("da");
   await expect(page.getByRole("textbox", { name: copy.da.code, exact: true })).toHaveValue(voucher.id);
+  await expect(page.locator(".golden-voucher .cast-character")).toHaveCount(0);
   await expect(page.locator(".golden-voucher-summary")).toContainText(money("da"));
   assert.equal(mutations.claims, 1, "switching an open voucher does not claim another voucher");
 
@@ -187,6 +195,7 @@ try {
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await assertInviteDate("en");
   await expect(page.locator("blockquote")).toHaveText(invitation.message);
+  await expect(page.locator(".invite-page .cast-character")).toHaveCount(0);
   await page.locator("#guest-name").fill("Freja");
   await page.locator('input[name="answer"][value="maybe"]').check();
   await page.locator(".rsvp-form button.primary").click();
@@ -211,6 +220,7 @@ try {
   const partnerError = page.locator(".partner-page").getByRole("alert");
   await expect(partnerError).toBeVisible();
   await expect(partnerError).toHaveText("Forkert e-mail eller adgangskode.");
+  await expect(page.locator(".partner-page .cast-character")).toHaveCount(0);
   await page.locator("#partner-password").fill("synthetic-language-password");
   await setLanguage("sv");
   await expect(page.locator("#partner-email")).toHaveValue("language@example.test");
@@ -225,6 +235,7 @@ try {
   await expect(page.locator(".finder-submit")).toBeInViewport({ ratio: 1 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "English mobile controls fit the viewport");
   assert.equal(mutations.claims, 1);
+  await assertCharacterScope(page);
   assert.deepEqual(unexpectedMutations, []);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ passed: true, mutations, checks: ["Danish default independent of browser locale", "Danish/English/Swedish labels, aria, dates and DKK prices", "cookie persists across reload and partner/invite/voucher navigation", "open finder values and errors survive language changes", "open voucher and failed RSVP/login survive changes without extra mutations", "English mobile search remains visible"] }));

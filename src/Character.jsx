@@ -15,12 +15,6 @@ export const characters = [
   { id: "turtleneck", name: "Den sorte rullekrave" },
 ];
 
-export const categoryCharacters = {
-  park: "blue-coat",
-  bar: "football",
-  restaurant: "stripes",
-};
-
 // Cutout row bounds include the top row's shoes; update if that sheet is replaced.
 const cutoutRows = [0, 544, 1024, 1536];
 

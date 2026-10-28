@@ -2,6 +2,7 @@ import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import sharp from "sharp";
+import { assertCharacterScope } from "./verify-character-motion.mjs";
 
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const scenes = [
@@ -36,6 +37,7 @@ await context.route("**/api/weather", (route) => route.fulfill({
     }],
   },
 }));
+await context.route("**/api/golden-hour/offers", (route) => route.fulfill({ json: { offers: [] } }));
 const errors = [];
 const claimRequests = [];
 page.on("pageerror", (error) => errors.push(error.message));
@@ -215,7 +217,7 @@ try {
   }
   await page.goto(base, { waitUntil: "domcontentloaded" });
   await page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
-  const hero = page.locator('.experience-hero[data-experience="weather.cloud"]');
+  const hero = page.locator('.opening-theatre[data-scene="opening.no-sun"]');
   await expect(hero).toBeVisible();
   const heroCharacters = hero.locator(".cast-character");
   await expect(heroCharacters).toHaveCount(1);
@@ -227,10 +229,11 @@ try {
       ]),
     ),
     [["blue-shirt", "cloud-angry"]],
-    "documented overcast weather selects the single angry blue-shirt character",
+    "the overcast opening selects one blue-shirt character",
   );
-  await expect(hero.locator('.character-scene[data-moment="weather.cloud"]')).toHaveCount(1);
-  await expect(hero.locator(".character-weather-prop")).toHaveCount(1);
+  await expect(hero.locator(".opening-weather-prop")).toHaveCount(1);
+  await expect(hero.locator(".opening-strings line")).toHaveCount(6);
+  assert.ok(await page.locator(".cast-character").evaluateAll((nodes) => nodes.every((node) => node.closest(".opening-theatre"))), "figures appear only in the initial opening before the gallery is opened");
   for (const character of await heroCharacters.all()) {
     await expect(character).toHaveAttribute("aria-hidden", "true");
     assert.equal(
@@ -248,7 +251,7 @@ try {
   await assertTouchTarget(launcher(), "character theatre launcher");
   await assertNoOverflow();
   await assertMapAccessible();
-  await waitForIllustration(launcher().locator("img"), "sunspot-cast.png");
+  await expect(launcher().locator("img")).toHaveCount(0);
   await page.screenshot({ path: "artifacts/visual-identity-mobile.png" });
 
   await launcher().click();
@@ -334,16 +337,14 @@ try {
     .toBe(0);
   await assertNoOverflow();
   await waitForIllustration(theatre().locator(".theatre-stage img"));
-  await waitForIllustration(
-    demo.locator(".theatre-example-picture img"),
-    "beer-seated.png",
-  );
+  await expect(demo.locator(".cast-character, img")).toHaveCount(0);
   await page.screenshot({
     path: "artifacts/visual-identity-theatre-mobile.png",
   });
   await page.keyboard.press("Escape");
   await expect(theatre()).toHaveCount(0);
   await expect(launcher()).toBeFocused();
+  await assertCharacterScope(page);
   await assertMapAccessible();
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -371,7 +372,7 @@ try {
       passed: true,
       checks: [
         "illustration assets including paper and transparent atlases and five transparent poses",
-        "one weather-driven hero character and an unobstructed search button",
+        "one opening marionette with strings and an unobstructed search button",
         "nine named characters in exact atlas cells, three desktop and two mobile columns",
         "five accessible scenes",
         "keyboard scene navigation",

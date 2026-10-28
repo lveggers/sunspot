@@ -1,4 +1,6 @@
 const messages = {
+  "opening.goldenHourTitle": { da: "Golden Hour i solen", en: "Golden Hour in the sun", sv: "Golden Hour i solen" },
+  "opening.goldenHourBody": { da: "{title} hos {place} · {price}", en: "{title} at {place} · {price}", sv: "{title} på {place} · {price}" },
   "experience.weather.loading.title": {"da": "Henter sol og vejr", "en": "Loading sun and weather", "sv": "Hämtar sol och väder"},
   "experience.weather.loading.body": {"da": "Henter vejrdata og beregner solforhold.", "en": "Loading weather data and calculating sunlight.", "sv": "Hämtar väderdata och beräknar solläget."},
   "experience.weather.sun.title": {"da": "Find et sted i solen", "en": "Find a sunny spot", "sv": "Hitta en plats i solen"},

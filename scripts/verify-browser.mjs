@@ -2,6 +2,7 @@ import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { atHour, clock, localDate } from "../src/lib.js";
+import { assertCharacterScope } from "./verify-character-motion.mjs";
 
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const browser = await chromium.launch({
@@ -15,11 +16,9 @@ const context = await browser.newContext({
 await context.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
 const errors = [];
 const expandFinder = async (target) => {
-  const toggle = target.getByRole("button", {
-    name: "Välj plats och tid",
-    exact: true,
-  });
-  if (await toggle.isVisible()) await toggle.click();
+  const toggle = target.locator(".finder-toggle");
+  await toggle.waitFor({ state: "visible" });
+  if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
 };
 
 const page = await context.newPage();
@@ -132,6 +131,8 @@ try {
   for (const name of ["Park", "Mat"])
     await page.getByRole("button", { name, exact: true }).click();
   await find();
+  await expect(page.locator(".opening-theatre")).toHaveCount(0);
+  await assertCharacterScope(page);
   await expect(page.locator('.finder-empty[data-experience="empty.no-types"] > p')).toHaveText(
     "Välj park, bar eller mat för att se platser.",
   );
@@ -146,6 +147,9 @@ try {
   await find();
   await expect(page.locator(".finder-summary")).toContainText("2 match");
   await expect(page.locator(".detail-card")).toContainText("Café Stefanshus");
+  await page.getByRole("button", { name: "Visa Café Stefanshus", exact: true }).click();
+  await expect(page.locator(".map-workspace.opening-active")).toHaveCount(0);
+  await assertCharacterScope(page);
   const sunFocus = page.locator(".sun-focus-color-pane");
   await expect(sunFocus).toHaveCount(1);
   await expect(sunFocus).toHaveCSS("pointer-events", "none");
@@ -159,14 +163,9 @@ try {
     .getByRole("button", { name: "Visa platslista", exact: true })
     .click();
   await expect(page.locator(".place-list h3")).toHaveCount(2);
-  assert.deepEqual(
-    await page
-      .locator(".place-art")
-      .evaluateAll((items) => [
-        ...new Set(items.map((item) => item.dataset.category)),
-      ]),
-    ["bar"],
-  );
+  await assertCharacterScope(page);
+  for (const card of await page.locator(".place-list .place-card").all())
+    await expect(card.locator(".place-copy > p")).toContainText(/^Bar\b/);
   await page.keyboard.press("Escape");
   await page.screenshot({ path: "artifacts/finder-results-desktop.png" });
   weatherMode = "cloud";
@@ -218,6 +217,7 @@ try {
   ).toBeVisible();
   await guest.reload({ waitUntil: "domcontentloaded" });
   await expect(guest.getByText("1 kommer", { exact: true })).toBeVisible();
+  await expect(guest.locator(".cast-character")).toHaveCount(0);
   await guest.getByRole("radio", { name: "Kanske", exact: true }).check();
   await guest
     .getByRole("button", { name: "Spara mitt svar", exact: true })
@@ -309,13 +309,14 @@ try {
   nearby.on("pageerror", (error) => errors.push(error.message));
   await nearby.clock.setSystemTime(new Date("2026-10-27T11:00:00Z"));
   await nearby.goto(base, { waitUntil: "domcontentloaded" });
+  await expandFinder(nearby);
   await nearby.getByRole("button", { name: "Nära mig", exact: true }).click();
   await expect(
     nearby.getByRole("button", { name: "Inom 1,5 km från dig" }),
   ).toBeVisible();
   await geoContext.close();
   for (const [position, permissions, moment, message] of [
-    [{ latitude: 56, longitude: 10 }, ["geolocation"], "empty.outside", "SunSpot täcker Köpenhamn. Välj ett område i staden."],
+    [{ latitude: 56, longitude: 10 }, ["geolocation"], "empty.outside", "SunSpot täcker centrala Köpenhamn just nu. Välj ett område i Köpenhamn i stället."],
     [{ latitude: 55.69, longitude: 12.55 }, [], "empty.location", "Välj ett område manuellt eller tillåt åtkomst till din plats."],
   ]) {
     const scenario = await browser.newContext({
@@ -330,10 +331,11 @@ try {
     locationPage.on("pageerror", (error) => errors.push(error.message));
     await locationPage.clock.setSystemTime(new Date("2026-10-27T11:00:00Z"));
     await locationPage.goto(base, { waitUntil: "domcontentloaded" });
+    await expandFinder(locationPage);
     await locationPage
       .getByRole("button", { name: "Nära mig", exact: true })
       .click();
-    await expect(locationPage.locator(`.experience-hero[data-experience="${moment}"] .hero-invitation`)).toHaveText(message, {
+    await expect(locationPage.locator(`.finder-notice[data-reason="${moment}"]`)).toHaveText(message, {
       timeout: 15000,
     });
     await scenario.close();
@@ -352,6 +354,7 @@ try {
   });
   const delayed = await delayedContext.newPage();
   await delayed.goto(base, { waitUntil: "domcontentloaded" });
+  await expandFinder(delayed);
   await delayed.getByRole("button", { name: "Nära mig", exact: true }).click();
   await expect(delayed.locator("#district")).toBeDisabled();
   await delayed.evaluate(() => window.releaseLocation());
@@ -371,6 +374,7 @@ try {
     .getByRole("button", { name: "Ladda skuggdata igen", exact: true })
     .click();
   await ready();
+  await assertCharacterScope(page);
   assert.deepEqual(eventRequests, []);
   assert.deepEqual(errors, []);
   console.log(

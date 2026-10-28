@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import { useLanguage } from "./Language.jsx";
-import CharacterScene from "./CharacterScene.jsx";
 import { formatOfferPrice, selectExampleMoment } from "./offerExperience.js";
 import "./theatre.css";
 import "./offer-experience.css";
@@ -221,13 +220,6 @@ function ExampleTicket({ startedAt }) {
   return (
     <div className="theatre-example-ticket" data-experience={moment.id}>
       <span className="theatre-demo-mark">{t("theatre.exampleTicket")}</span>
-      <CharacterScene
-        moment={moment}
-        animate
-        confirmation={`example:${startedAt}`}
-        className="offer-experience-example-character"
-        sizes="80px"
-      />
       <strong role="timer" aria-label={t("theatre.remaining")}>
         {String(Math.floor(seconds / 60)).padStart(2, "0")}:
         {String(seconds % 60).padStart(2, "0")}
@@ -256,27 +248,16 @@ export function GoldenHourExample({ compact = false }) {
         {t("theatre.simulated")}
       </p>
       <p className="offer-experience-copy">{t("offerExperience.example.offer")}</p>
-      <div
-        className={`theatre-example-notification ${startedAt === null ? "" : "has-example-ticket"}`}
-      >
-        {startedAt === null && (
-          <div className="theatre-example-picture">
-            <CharacterScene
-              moment={moment}
-              className="offer-experience-example-character"
-              sizes="110px"
-            />
-            <span
-              className={`theatre-example-weather ${sunny ? "" : "is-cloudy"}`}
-            >
-              {sunny ? <Sun size={16} /> : <Cloud size={16} />}
-              {sunny ? t("theatre.simulatedSun") : t("theatre.simulatedCloud")}
-            </span>
-          </div>
-        )}
+      <div className="theatre-example-notification">
         <div className="theatre-example-copy">
           <span className="theatre-eyebrow">GOLDEN HOUR</span>
           <h3>Café Stefanshus</h3>
+          {startedAt === null && (
+            <span className={`theatre-example-weather ${sunny ? "" : "is-cloudy"}`}>
+              {sunny ? <Sun size={16} /> : <Cloud size={16} />}
+              {sunny ? t("theatre.simulatedSun") : t("theatre.simulatedCloud")}
+            </span>
+          )}
           <p className="theatre-example-deal">
             <strong>
               {t("offerExperience.example.beer", { price: formatOfferPrice(10, language) })}
@@ -361,15 +342,6 @@ export default function BrandTheatre({ compact = false, onExploreMap }) {
         type="button"
         onClick={() => setOpen(true)}
       >
-        <Image
-          src={illustrations["sunspot-cast"]}
-          placeholder="blur"
-          width={1536}
-          height={1024}
-          sizes="96px"
-          loading="lazy"
-          alt=""
-        />
         <span>{t("theatre.launch")}</span>
         <ArrowRight size={17} />
       </button>

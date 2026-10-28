@@ -145,7 +145,7 @@ export function weatherText(symbol = "", language = "da") {
   if (symbol.includes("fog")) return translate(language, "weather.fog");
   return translate(language, "weather.cloudy");
 }
-export async function api(path, { withStatus = false, ...options } = {}) {
+export async function api(path, options = {}) {
   const response = await fetch(`/api${path}`, {
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
@@ -153,7 +153,7 @@ export async function api(path, { withStatus = false, ...options } = {}) {
   const data = await response.json();
   if (!response.ok)
     throw Object.assign(new Error(data.error || "Något gick fel. Försök igen."), { status: response.status, code: data.code, params: data.params || {} });
-  return withStatus ? { data, status: response.status } : data;
+  return data;
 }
 export function saved(key, fallback = null) {
   try {

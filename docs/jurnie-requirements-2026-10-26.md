@@ -32,4 +32,6 @@ Mødets afsnit om andre bygge-/ejendomsprojekter er udeladt fra SunSpot-kravene.
 - De ni godkendte karakteridentiteter og deres grafiske stil bevares.
 - Erstat shademap-visningen med et kort, hvor bekræftede solsteder fremhæves i farver og resten dæmpes i gråt. Skyer skal indgå i beslutningen.
 
+Seneste ændring: Figurerne må kun bruges i åbningsscenens tre situationer (sol, ingen sol, sol med Golden Hour). Figurerne falder ned fra oven som dukketeater; sol og skyer hænger i synlige snore. Panelet skal være markant mindre, og appens baggrund mørk under åbningen. Dette erstatter den tidligere brede brug i appens funktioner.
+
 Disse supplerende krav kommer fra denne chat og må ikke tilskrives Jurnie-mødet.

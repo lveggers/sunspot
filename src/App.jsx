@@ -1,6 +1,8 @@
 import Link from "next/link";
-import Character, { categoryCharacters } from "./Character.jsx";
-import CharacterScene from "./CharacterScene.jsx";
+import OpeningTheatre from "./OpeningTheatre.jsx";
+import { selectOpeningScene } from "./openingScene.js";
+import { formatOfferPrice } from "./offerExperience.js";
+import "./opening-interface.css";
 import { selectWeatherMoment, selectEmptyMoment } from "./characterExperience.js";
 import { LanguageSwitcher, useLanguage } from "./Language.jsx";
 import { localeFor } from "./i18n.js";
@@ -28,7 +30,7 @@ import {
 } from "lucide-react";
 import MapView from "./MapView.jsx";
 import Modal from "./Modal.jsx";
-import { GoldenHourDiscovery } from "./GoldenHour.jsx";
+import { GoldenHourDiscovery, useGoldenHourOffers } from "./GoldenHour.jsx";
 import BrandTheatre from "./BrandTheatre.jsx";
 import Invite from "./Invite.jsx";
 import * as SunCalc from "suncalc";
@@ -82,23 +84,13 @@ function WeatherIcon({ symbol = "", ...props }) {
   return <Icon {...props} />;
 }
 function PlaceCard({ place, selected, result, onSelect }) {
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   return (
     <button
       className={`place-card ${selected ? "selected" : ""}`}
       onClick={() => onSelect(place)}
       aria-pressed={selected}
     >
-      <div className="place-art" data-category={place.category}>
-        <Character character={categoryCharacters[place.category]} />
-        <small>
-          {place.category === "park"
-            ? t("finder.outdoors")
-            : place.category === "bar"
-              ? t("finder.barBadge")
-              : t("finder.foodBadge")}
-        </small>
-      </div>
       <div className="place-copy">
         <div className="place-name">
           <h3>{place.name}</h3>
@@ -165,11 +157,6 @@ function CreateForm({ place, date, hour, duration, onClose }) {
         setBusy(false);
         return;
       }
-      try {
-        sessionStorage.setItem(`sunspot:created-invite:${created.id}`, "1");
-      } catch {
-        // Creation succeeds even when optional animation handoff storage is blocked.
-      }
       router.push(`/invite/${created.id}`);
     } catch (e) {
       setError(e);
@@ -180,7 +167,6 @@ function CreateForm({ place, date, hour, duration, onClose }) {
     <Modal title={t("finder.createTitle")} onClose={onClose}>
       <form className="create-form" onSubmit={submit}>
         <div className="plan-summary">
-          <Character character="stripes" className="plan-character" />
           <div>
             <strong>{place.name}</strong>
             <p>{t(`flows.activity.${activityFor(place.category)}`)}</p>
@@ -241,6 +227,9 @@ function CreateForm({ place, date, hour, duration, onClose }) {
 
 export default function App() {
   const { language, t, errorText } = useLanguage();
+  const inviteId = window.location.pathname.startsWith("/invite/")
+    ? window.location.pathname.split("/")[2]
+    : null;
   const number = new Intl.NumberFormat(localeFor(language));
   const days = dayOptions(language);
   const [date, setDate] = useState(localDate);
@@ -262,6 +251,8 @@ export default function App() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [finderOpen, setFinderOpen] = useState(true);
   const [finderExpanded, setFinderExpanded] = useState(false);
+  const [showOpening, setShowOpening] = useState(true);
+  const goldenOffers = useGoldenHourOffers(!inviteId);
   const [hasResults, setHasResults] = useState(false);
   const [fitResultsToken, setFitResultsToken] = useState(0);
   const [weather, setWeather] = useState(null);
@@ -282,9 +273,7 @@ export default function App() {
       ),
     );
   });
-  const inviteId = window.location.pathname.startsWith("/invite/")
-    ? window.location.pathname.split("/")[2]
-    : null;
+
 
   useEffect(() => {
     if (inviteId) return;
@@ -380,8 +369,13 @@ export default function App() {
     unconfirmedOpen: Boolean(withoutOpeningFilter?.length),
     weatherMoment,
   });
-  const heroMoment = !categories.length || locationError === "finder.outsideCoverage" || locationError === "experience.empty.location.body"
-    ? emptyMoment : weatherMoment;
+  const heroMoment = weatherMoment;
+  const openingScene = selectOpeningScene({
+    weatherMoment,
+    offers: goldenOffers.offers,
+    sunnyPlaceIds: sunPlaces.map((place) => place.id),
+    loading: pending || goldenOffers.loading,
+  });
   const momentParams = {
     placeName: sunPlaces[0]?.name || t("finder.city"),
     date: date === localDate() ? t("day.today") : dateLabel(atHour(date, 12), language),
@@ -411,6 +405,7 @@ export default function App() {
 
   const selectPlace = useCallback(
     (place) => {
+      setShowOpening(false);
       setSelected(place);
       setDetailOpen(true);
       setModal(null);
@@ -441,6 +436,7 @@ export default function App() {
 
   function findSpots(event) {
     event.preventDefault();
+    setShowOpening(false);
     setHasResults(true);
     setFinderOpen(false);
     setFitResultsToken((value) => value + 1);
@@ -449,6 +445,7 @@ export default function App() {
     if (filtered.length) setSelected(filtered[0]);
   }
   function toggleCategory(id) {
+    setShowOpening(false);
     setCategories((current) =>
       current.includes(id)
         ? current.filter((value) => value !== id)
@@ -457,6 +454,7 @@ export default function App() {
     setDetailOpen(false);
   }
   function nearMe() {
+    setShowOpening(false);
     if (!navigator.geolocation) {
       setLocationError("finder.locationUnsupported");
       return;
@@ -534,7 +532,7 @@ export default function App() {
       ) : (
         <>
           <main
-            className={`map-workspace finder-workspace ${hasResults ? "has-results" : ""} ${finderOpen ? "finder-open" : ""}`}
+            className={`map-workspace finder-workspace ${hasResults ? "has-results" : ""} ${finderOpen ? "finder-open" : ""} ${showOpening ? "opening-active" : ""}`}
             data-solar-pending={solar.pending}
           >
             <aside
@@ -566,15 +564,18 @@ export default function App() {
               )}
               {finderOpen ? (
                 <form onSubmit={findSpots}>
-                  <div className="golden-hero paper-hero experience-hero" lang={language} data-experience={heroMoment.id}>
+                  <div className={`golden-hero paper-hero experience-hero ${showOpening ? "opening-intro" : "finder-plain-intro"}`} lang={language} data-experience={heroMoment.id}>
                     <div>
                       <span className="paper-edition">{t("finder.edition")}</span>
-                      <h1>{t(`experience.${heroMoment.id}.title`)}</h1>
-                      <p className="hero-invitation">{t(`experience.${heroMoment.id}.body`, momentParams)}</p>
+                      <h1>{openingScene?.id === "opening.golden-hour" && showOpening ? t("opening.goldenHourTitle") : t(`experience.${heroMoment.id}.title`)}</h1>
+                      <p className="hero-invitation">{openingScene?.id === "opening.golden-hour" && showOpening
+                        ? t("opening.goldenHourBody", { title: openingScene.offer.title, place: openingScene.offer.placeName, price: formatOfferPrice(openingScene.offer.priceDkk, language) })
+                        : t(`experience.${heroMoment.id}.body`, momentParams)}</p>
+                      {showOpening && openingScene?.offer?.demo && <small className="opening-demo">{t("flows.offer.demo")}</small>}
                       {heroMoment.id === "weather.night" && !weather?.available && <small>{t("experience.weatherStatusMissing")}</small>}
-                      {heroAction && <button type="button" className="experience-action" onClick={heroAction.run}>{t(heroAction.label)}</button>}
+                      {heroAction && <button type="button" className="experience-action" onClick={() => { setShowOpening(false); heroAction.run(); }}>{t(heroAction.label)}</button>}
                     </div>
-                    <CharacterScene moment={heroMoment} className="hero-moment" animate={!modal} />
+                    {showOpening && <OpeningTheatre scene={openingScene} animate={!modal} />}
                   </div>
                   <div className="finder-edit-row">
                     <button
@@ -582,7 +583,7 @@ export default function App() {
                       type="button"
                       aria-expanded={finderExpanded}
                       aria-controls="finder-fields"
-                      onClick={() => setFinderExpanded((value) => !value)}
+                      onClick={() => { setShowOpening(false); setFinderExpanded((value) => !value); }}
                     >
                       <SlidersHorizontal size={16} />{" "}
                       {finderExpanded ? t("finder.closeFields") : t("finder.openFields")}
@@ -609,8 +610,8 @@ export default function App() {
                     <span>·</span> {date === localDate() ? t("day.today") : dateLabel(atHour(date, 12), language)}{" "}
                     <span>·</span> {clock(atHour(date, hour))}
                   </div>
-                  {locationError && !["finder.outsideCoverage", "experience.empty.location.body"].includes(locationError) && (
-                    <p className="finder-notice" role="status">
+                  {locationError && (
+                    <p className="finder-notice" role="status" data-reason={locationError === "finder.outsideCoverage" ? "empty.outside" : "empty.location"}>
                       {errorText(locationError)}
                     </p>
                   )}
@@ -623,6 +624,7 @@ export default function App() {
                       value={district}
                       disabled={locating}
                       onChange={(event) => {
+                        setShowOpening(false);
                         setDistrict(event.target.value);
                         setOrigin(null);
                         setLocationError("");
@@ -642,7 +644,7 @@ export default function App() {
                         type="button"
                         className={`now-button ${live ? "active" : ""}`}
                         aria-pressed={live}
-                        onClick={() => setLive(true)}
+                        onClick={() => { setShowOpening(false); setLive(true); }}
                       >
                         {t("finder.now")}
                       </button>
@@ -654,6 +656,7 @@ export default function App() {
                           aria-label={t("finder.day")}
                           value={date}
                           onChange={(event) => {
+                            setShowOpening(false);
                             setDate(event.target.value);
                             setLive(false);
                           }}
@@ -675,6 +678,7 @@ export default function App() {
                           onChange={(event) => {
                             if (!/^\d{2}:\d{2}$/.test(event.target.value))
                               return;
+                            setShowOpening(false);
                             const [h, m] = event.target.value
                               .split(":")
                               .map(Number);
@@ -697,7 +701,6 @@ export default function App() {
                             aria-pressed={categories.includes(id)}
                             onClick={() => toggleCategory(id)}
                           >
-                            <Character character={categoryCharacters[id]} />
                             <strong>{t(label)}</strong>
                             <small>{t(caption)}</small>
                           </button>
@@ -713,7 +716,7 @@ export default function App() {
                     {pending ? t("finder.searching") : t("finder.submit")}
                     <ArrowUpRight size={20} />
                   </button>
-                  <GoldenHourDiscovery compact />
+                  <GoldenHourDiscovery compact data={goldenOffers} />
                   <div className="finder-secondary">
                     <span>
                       <Sun size={12} />
@@ -722,7 +725,7 @@ export default function App() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setModal("filters")}
+                      onClick={() => { setShowOpening(false); setModal("filters"); }}
                       aria-label={t("finder.openFilters")}
                     >
                       <SlidersHorizontal size={14} />
@@ -768,7 +771,6 @@ export default function App() {
                         </strong>
                       )}
                     </div>
-                    {!filtered.length && <CharacterScene moment={emptyMoment} className="summary-character" sizes="64px" />}
                   </div>
                   <div className="finder-summary-actions">
                     <button
@@ -784,7 +786,7 @@ export default function App() {
                     <button
                       className="icon-button"
                       aria-label={t("finder.openFilters")}
-                      onClick={() => setModal("filters")}
+                      onClick={() => { setShowOpening(false); setModal("filters"); }}
                     >
                       <SlidersHorizontal size={19} />
                     </button>
@@ -819,7 +821,7 @@ export default function App() {
                       ))}
                     </section>
                   )}
-                  <GoldenHourDiscovery compact />
+                  <GoldenHourDiscovery compact data={goldenOffers} />
                   <button
                     className="finder-weather"
                     onClick={() => setModal("weather")}
@@ -897,7 +899,6 @@ export default function App() {
                       </div>
                       <h2>{selected.name}</h2>
                     </div>
-                    <Character character={categoryCharacters[selected.category]} />
                   </div>
                   <div className="sun-window">
                     <div>
@@ -932,10 +933,6 @@ export default function App() {
                   </div>
                   <details className="place-more">
                     <summary>{t("finder.morePlace")}</summary>
-                    <div className="place-moment" data-experience="place.directions">
-                      <CharacterScene moment={{ id: "place.directions", character: "cyclist", pose: "cycling" }} sizes="56px" />
-                      <p>{t("experience.place.directions")}</p>
-                    </div>
                     <p className="detail-description">{placeText(selected, "description", language)}</p>
                     <p className="point-note">
                       {selected.category === "park"
@@ -1240,7 +1237,6 @@ export default function App() {
               ))
             ) : (
               <div className="empty-state">
-                <Character character="green-jacket" />
                 <h3>{t("finder.emptyGatheringsTitle")}</h3>
                 <p>
                   {t("finder.emptyGatherings")}

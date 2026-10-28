@@ -2,36 +2,15 @@
   flex: 1;
   min-width: 0;
 }
-.golden-discovery-button > .offer-experience-discovery-character {
-  width: 38px;
-  flex: 0 0 38px;
-}
-.golden-list-intro:not(:has(.character-scene)) {
+.golden-list-intro,
+.golden-offer-summary,
+.golden-voucher-summary,
+.partner-intro {
   grid-template-columns: minmax(0, 1fr);
 }
-.golden-offer-card > .offer-experience-card-character {
-  width: 96px;
-  flex: 0 0 96px;
-}
-.golden-offer-card > span:not(.character-scene) {
+.golden-offer-card > span {
   flex: 1;
   min-width: 0;
-}
-.golden-offer-summary,
-.golden-voucher-summary {
-  grid-template-columns: minmax(0, 1fr) 96px;
-}
-.golden-offer-summary:not(:has(.character-scene)),
-.golden-voucher-summary:not(:has(.character-scene)) {
-  grid-template-columns: minmax(0, 1fr);
-}
-[data-experience="offer.checking"] .offer-experience-character {
-  opacity: 0.55;
-}
-[data-experience="voucher.expired"] .offer-experience-character,
-[data-experience="example.expired"] .offer-experience-example-character {
-  filter: saturate(0.15);
-  opacity: 0.7;
 }
 .offer-experience-copy {
   margin: 10px 0;
@@ -44,61 +23,17 @@
 .golden-voucher > .golden-text-button {
   margin-right: 12px;
 }
-.partner-intro:not(:has(.golden-art)) {
-  grid-template-columns: minmax(0, 1fr);
-}
-.partner-offer > .offer-experience-partner-character {
-  float: right;
-  width: 64px;
-  margin-left: 10px;
-}
 .theatre-example .theatre-example-notification {
-  grid-template-columns: 110px minmax(0, 1fr);
-  gap: 14px;
-}
-.theatre-example .theatre-example-notification.has-example-ticket {
   grid-template-columns: minmax(0, 1fr);
-}
-.theatre-example .theatre-example-picture {
-  align-self: start;
-  display: block;
-  min-height: 0;
-  padding-bottom: 54px;
-  aspect-ratio: auto;
-  background: transparent;
-  overflow: visible;
 }
 .theatre-example .theatre-example-weather {
-  bottom: 0;
-  left: 0;
+  position: static;
+  display: inline-flex;
   max-width: 100%;
+  margin-top: 10px;
   line-height: 1.4;
 }
-.theatre-example .theatre-example-ticket {
-  grid-template-columns: minmax(0, 1fr) 64px;
-  align-items: center;
-}
-.theatre-example-ticket > .offer-experience-example-character {
-  grid-column: 2;
-  grid-row: 1 / 3;
-}
-.theatre-example-ticket > strong {
-  grid-column: 1;
-  grid-row: 2;
-}
-.theatre-example-ticket > span:last-child {
-  grid-column: 1 / -1;
-}
 @media (max-width: 760px) {
-  .golden-offer-card > .offer-experience-card-character {
-    width: 64px;
-    flex-basis: 64px;
-  }
-  .golden-offer-summary,
-  .golden-voucher-summary {
-    grid-template-columns: minmax(0, 1fr) 72px;
-    gap: 8px;
-  }
   .golden-offer-summary h3,
   .golden-voucher-summary h3 {
     font-size: 22px;
@@ -108,13 +43,6 @@
     padding: 7px;
     font-size: 9px;
     line-height: 1.4;
-  }
-  .theatre-example .theatre-example-notification {
-    grid-template-columns: 76px minmax(0, 1fr);
-    gap: 10px;
-  }
-  .theatre-example .theatre-example-picture {
-    padding-bottom: 72px;
   }
   .theatre-example .theatre-example-copy {
     padding: 0;

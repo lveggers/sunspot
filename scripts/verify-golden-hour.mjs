@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
+import { assertCharacterScope } from "./verify-character-motion.mjs";
 
 // UI contract fixtures; server authorization and solar checks have separate Node regressions.
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
@@ -14,36 +15,6 @@ const context = await browser.newContext({
 await context.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
 const page = await context.newPage();
 const errors = [];
-const waitForIllustration = async (artwork, filename) => {
-  await expect(artwork).toBeVisible();
-  if (filename) {
-    const source = new URL(await artwork.getAttribute("src"), base);
-    const imageUrl =
-      source.pathname === "/_next/image"
-        ? source.searchParams.get("url")
-        : source.href;
-    const imagePath = new URL(imageUrl, base).pathname;
-    const stem = filename.replace(/\.png$/, "");
-    assert.match(
-      imagePath,
-      new RegExp(`/${stem}(?:\\.[A-Za-z0-9_-]+)?\\.png$`),
-    );
-  }
-  await expect
-    .poll(
-      () => artwork.evaluate((img) => img.complete && img.naturalWidth > 0),
-      { timeout: 15000 },
-    )
-    .toBe(true);
-  await artwork.evaluate((img) => img.decode());
-};
-const assertCharacter = async (scope, name, pose) => {
-  const character = scope.locator(`.cast-character[data-character="${name}"]`);
-  await expect(character).toHaveCount(1);
-  await expect(character).toHaveAttribute("data-pose", pose);
-  await waitForIllustration(character.locator("img"), `${pose}.png`);
-};
-
 page.on("pageerror", (error) => errors.push(error.message));
 let serverTime = Date.parse("2026-10-27T11:00:00Z");
 const iso = () => new Date(serverTime).toISOString();
@@ -175,7 +146,8 @@ try {
     exact: true,
   });
   await expect(detail.getByText("Demo beer", { exact: true })).toBeVisible();
-  await assertCharacter(detail.locator(".golden-offer-summary"), "puffer", "beer-seated");
+  await expect(detail.locator(".cast-character")).toHaveCount(0);
+  await assertCharacterScope(page);
   await expect(detail.locator(".golden-demo")).toBeVisible();
   await page.setViewportSize({ width: 390, height: 667 });
   await expect(
@@ -209,7 +181,7 @@ try {
     page.getByRole("timer", { name: "Tid kvar på kupongen" }),
   ).toHaveText(/^(45:00|44:\d{2})$/);
   await page.setViewportSize({ width: 390, height: 667 });
-  await assertCharacter(page.locator(".golden-voucher-summary"), "puffer", "beer-seated");
+  await expect(page.locator(".golden-voucher .cast-character")).toHaveCount(0);
   const proof = page.locator(".golden-voucher-proof");
   await expect(proof.getByRole("timer")).toBeInViewport({ ratio: 1 });
   await expect(
@@ -237,7 +209,7 @@ try {
   await page.goto(`${base}/?offer=fixture-cocktail`, {
     waitUntil: "domcontentloaded",
   });
-  await assertCharacter(page.locator(".golden-offer-summary"), "blue-coat", "cocktail-seated");
+  await expect(page.locator(".golden-offer-detail .cast-character")).toHaveCount(0);
   await page.evaluate(() => {
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -295,12 +267,7 @@ try {
     .click();
   await expect(page.locator(".partner-voucher-list button")).toBeDisabled();
   await page.setViewportSize({ width: 1440, height: 1000 });
-  for (const artwork of await page
-    .locator(".partner-page img.golden-art")
-    .all()) {
-    await artwork.scrollIntoViewIfNeeded();
-    await waitForIllustration(artwork);
-  }
+  await expect(page.locator(".partner-page .cast-character")).toHaveCount(0);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.screenshot({
     path: "artifacts/golden-hour-partner.png",
@@ -314,7 +281,7 @@ try {
       passed: true,
       checks: [
         "offer deep links and a visible mobile claim button",
-        "offer and mobile voucher characters decoded from the selected pose assets",
+        "offer, voucher and partner surfaces contain no character figures",
         "mobile voucher timer and code visible without scrolling",
         "public offer sharing",
         "immutable server-anchored countdown and reload",

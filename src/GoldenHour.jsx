@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { GoldenHourExample } from "./BrandTheatre.jsx";
-import CharacterScene from "./CharacterScene.jsx";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -23,7 +22,6 @@ import {
   formatOfferPrice as money,
   selectOfferMoment,
   selectVoucherMoment,
-  redeemedVoucherConfirmation,
 } from "./offerExperience.js";
 import "./offer-experience.css";
 
@@ -100,7 +98,7 @@ function VoucherClock({ expiresAt, serverNow, children }) {
   return children({ remaining, label });
 }
 
-function VoucherCard({ voucher, serverNow, confirmation }) {
+function VoucherCard({ voucher, serverNow }) {
   const { language, t } = useLanguage();
   return (
     <VoucherClock
@@ -129,13 +127,6 @@ function VoucherCard({ voucher, serverNow, confirmation }) {
                 <h3>{voucher.title}</h3>
                 <p>{voucher.placeName} · {money(voucher.priceDkk, language)}</p>
               </div>
-              <CharacterScene
-                moment={moment}
-                animate
-                confirmation={confirmation}
-                className="offer-experience-character"
-                sizes="100px"
-              />
             </div>
             <div className="golden-voucher-proof">
               <div
@@ -194,8 +185,6 @@ function OfferDetail({ id }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [claimRejected, setClaimRejected] = useState(false);
-  const [voucherConfirmation, setVoucherConfirmation] = useState(undefined);
-  const observedVoucher = useRef(null);
   useEffect(() => {
     let controller;
     const refresh = () => {
@@ -222,9 +211,6 @@ function OfferDetail({ id }) {
         })
           .then((value) => {
             if (!request.signal.aborted) {
-              // Only an observed redemption transition carries a receipt.
-              setVoucherConfirmation(redeemedVoucherConfirmation(observedVoucher.current, value.voucher));
-              observedVoucher.current = value.voucher;
               setCoupon(value);
             }
           })
@@ -249,13 +235,10 @@ function OfferDetail({ id }) {
     setError("");
     setClaimRejected(false);
     try {
-      const response = await api(
+      const value = await api(
         `/golden-hour/offers/${encodeURIComponent(id)}/claim`,
-        { method: "POST", withStatus: true },
+        { method: "POST" },
       );
-      const value = response.data;
-      setVoucherConfirmation(response.status === 201 ? `claim:${value.voucher.id}` : undefined);
-      observedVoucher.current = value.voucher;
       setCoupon(value);
       if (!save(`golden-voucher:${id}`, value.voucher.id))
         setError(
@@ -274,7 +257,6 @@ function OfferDetail({ id }) {
         <VoucherCard
           voucher={coupon.voucher}
           serverNow={coupon.serverNow}
-          confirmation={voucherConfirmation}
         />
         {error && (
           <p className="error" role="alert">
@@ -309,12 +291,6 @@ function OfferDetail({ id }) {
           <h3>{offer.title}</h3>
           <strong className="golden-price">{money(offer.priceDkk, language)}</strong>
         </div>
-        <CharacterScene
-          moment={moment}
-          animate
-          className="offer-experience-character"
-          sizes="100px"
-        />
       </div>
       <p>{offer.description}</p>
       <p className="golden-availability" role="status">
@@ -366,16 +342,12 @@ function OfferDetail({ id }) {
   );
 }
 
-export function GoldenHourDiscovery({ compact = false }) {
-  const { language, t, errorText } = useLanguage();
+export function useGoldenHourOffers(enabled = true) {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeId, setActiveId] = useState(() =>
-    new URL(window.location.href).searchParams.get("offer"),
-  );
-  const [open, setOpen] = useState(Boolean(activeId));
   useEffect(() => {
+    if (!enabled) return;
     let controller;
     const refresh = () => {
       controller?.abort();
@@ -409,7 +381,27 @@ export function GoldenHourDiscovery({ compact = false }) {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, []);
+  }, [enabled]);
+  return { offers, loading, error };
+}
+
+function GoldenHourDiscoveryWithOffers(props) {
+  const data = useGoldenHourOffers();
+  return <GoldenHourDiscoveryContent {...props} data={data} />;
+}
+
+export function GoldenHourDiscovery({ compact = false, data }) {
+  return data === undefined
+    ? <GoldenHourDiscoveryWithOffers compact={compact} />
+    : <GoldenHourDiscoveryContent compact={compact} data={data} />;
+}
+
+function GoldenHourDiscoveryContent({ compact, data: { offers, loading, error } }) {
+  const { language, t, errorText } = useLanguage();
+  const [activeId, setActiveId] = useState(() =>
+    new URL(window.location.href).searchParams.get("offer"),
+  );
+  const [open, setOpen] = useState(Boolean(activeId));
   function close() {
     setOpen(false);
     setActiveId(null);
@@ -427,11 +419,6 @@ export function GoldenHourDiscovery({ compact = false }) {
         className="golden-discovery-button"
         onClick={() => setOpen(true)}
       >
-        <CharacterScene
-          moment={selectOfferMoment({ offer: offers[0] })}
-          className="offer-experience-discovery-character"
-          sizes="64px"
-        />
         <span className="golden-discovery-copy">
           <strong>{t("flows.discovery.heading")}</strong>
           <small>
@@ -495,11 +482,6 @@ export function GoldenHourDiscovery({ compact = false }) {
                       data-experience={selectOfferMoment({ offer }).id}
                       onClick={() => setActiveId(offer.id)}
                     >
-                      <CharacterScene
-                        moment={selectOfferMoment({ offer })}
-                        className="offer-experience-card-character"
-                        sizes="96px"
-                      />
                       <span>
                         <small>
                           {offer.placeName}
@@ -533,8 +515,6 @@ export function GoldenVoucherPage({ id }) {
   const { t, errorText } = useLanguage();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const [confirmation, setConfirmation] = useState(undefined);
-  const observedVoucher = useRef(null);
   useEffect(() => {
     let controller;
     const refresh = () => {
@@ -546,8 +526,6 @@ export function GoldenVoucherPage({ id }) {
       })
         .then((value) => {
           if (!request.signal.aborted) {
-            setConfirmation(redeemedVoucherConfirmation(observedVoucher.current, value.voucher));
-            observedVoucher.current = value.voucher;
             setData(value);
             setError("");
           }
@@ -585,7 +563,6 @@ export function GoldenVoucherPage({ id }) {
           <VoucherCard
             voucher={data.voucher}
             serverNow={data.serverNow}
-            confirmation={confirmation}
           />
         ) : (
           <p role={error ? "alert" : "status"}>{error ? errorText(error) : t("flows.voucher.loading")}</p>
@@ -882,11 +859,6 @@ export function PartnerPortal() {
               <div className="partner-offer-list">
                 {dashboard.offers.map((offer) => (
                   <article key={offer.id} className="partner-offer">
-                    <CharacterScene
-                      moment={selectOfferMoment({ offer })}
-                      className="offer-experience-partner-character"
-                      sizes="64px"
-                    />
                     <span className="golden-state">
                       {offer.state === "draft"
                         ? t("flows.partner.draft")

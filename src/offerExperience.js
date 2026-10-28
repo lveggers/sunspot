@@ -31,12 +31,6 @@ export function selectVoucherMoment({ voucher, remaining }) {
   return drinkMoment(`voucher.${state}`, voucher.kind);
 }
 
-export function redeemedVoucherConfirmation(previous, next) {
-  return previous?.id === next.id && !previous.redeemedAt && next.redeemedAt
-    ? `redeemed:${next.id}:${next.redeemedAt}`
-    : undefined;
-}
-
 export function selectExampleMoment({ sunny = true, started = false, remaining = 1 } = {}) {
   const state = started
     ? remaining <= 0 ? "expired" : "voucher"

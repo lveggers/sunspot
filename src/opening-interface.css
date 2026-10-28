@@ -1,0 +1,47 @@
+.finder-workspace .spot-finder { width: 340px; padding: 12px; }
+.finder-brand-row .finder-eyebrow { display: none; }
+.finder-brand-row .brand-theatre { flex: 1; min-width: 0; }
+.finder-brand-row .theatre-launch { min-height: 44px; font-size: 10px; }
+.finder-brand-row { margin-bottom: 3px; }
+.finder-workspace .controls-compact .finder-fields { display: none; }
+.finder-toggle { display: flex; gap: 6px; align-items: center; min-height: 44px; padding: 0; font-size: 11px; }
+.spot-finder .paper-hero.opening-intro {
+  grid-template-columns: minmax(0, 1fr) 110px;
+  min-height: 112px;
+  gap: 4px;
+  margin: 0 0 4px;
+}
+.spot-finder .paper-hero.opening-intro h1 { font-size: 23px; line-height: 1.04; letter-spacing: -0.6px; }
+.opening-intro .paper-edition { display: none; }
+.opening-demo { display: block; margin-top: 4px; font-size: 9px; line-height: 1.3; }
+.opening-intro .hero-invitation, .finder-plain-intro .hero-invitation {
+  display: block;
+  max-width: none;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.spot-finder .paper-hero.finder-plain-intro { display: block; min-height: 0; margin: 8px 0; }
+.spot-finder .paper-hero.finder-plain-intro h1 { font-size: 25px; line-height: 1.1; }
+.finder-types button { justify-content: center; min-height: 60px; }
+.finder-result-heading, .detail-heading { grid-template-columns: minmax(0, 1fr); }
+.detail-heading > div { grid-column: 1; }
+.experience-action { min-height: 36px; padding: 0; color: var(--blue); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+.opening-active::after { content: ""; position: absolute; inset: 0; z-index: 620; background: #0b171bd1; pointer-events: none; }
+.opening-active .spot-finder form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 8px; }
+.opening-active .opening-intro, .opening-active .finder-notice, .opening-active .golden-discovery { grid-column: 1 / -1; }
+.opening-active .finder-edit-row { grid-column: 1; grid-row: 2; }
+.opening-active .finder-submit { grid-column: 2; grid-row: 2; min-height: 44px; margin: 0; padding: 6px; font-size: 11px; gap: 4px; }
+.opening-active .finder-submit svg { flex-shrink: 0; width: 16px; }
+.opening-active .finder-current-choice, .opening-active .finder-secondary, .opening-active .finder-weather, .opening-active .nearby-button { display: none; }
+.opening-active .golden-discovery { margin: 2px 0 0; }
+.opening-active .golden-discovery-button { min-height: 44px; padding: 6px 9px; }
+.opening-active .golden-discovery-button small { display: none; }
+@media (max-width: 760px) {
+  .finder-workspace .spot-finder { width: auto; padding: 10px 12px; }
+  .spot-finder .paper-hero.opening-intro h1 { font-size: 22px; }
+  .opening-intro .hero-invitation { font-size: 10px; }
+  .finder-workspace .spot-finder.controls-compact { max-height: 52dvh; }
+  .finder-workspace .spot-finder:not(.is-expanded) { max-height: min(240px, 38dvh); }
+  .finder-summary .finder-empty { margin-top: 8px; font-size: 12px; }
+}

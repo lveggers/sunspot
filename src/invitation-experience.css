@@ -1,8 +1,29 @@
-.invite-cast { justify-content: center; }
-.invite-cast > .character-scene { width: 50%; flex: 0 1 50%; }
-.invite-moment-copy { margin: 12px 0; font-size: 13px; line-height: 1.6; }
-.invite-weather { margin: 12px 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
-.rsvp-people { display: flex; flex-wrap: wrap; gap: 2px; margin: 8px 0 16px; }
-.rsvp-people > .character-scene { width: 24px; }
-.invite-card .answer-options .character-scene { width: clamp(42px, 9vw, 60px); }
-.invite-next-action { margin: 14px 0; }
+.invite-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px dashed var(--line);
+}
+.invite-heading .eyebrow {
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.invite-heading h1 {
+  font-weight: 500;
+}
+.invite-moment-copy {
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.invite-weather {
+  margin: 12px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.invite-card .answer-options label {
+  min-height: 44px;
+  align-content: center;
+}
+.invite-next-action {
+  margin: 14px 0;
+}

@@ -12,7 +12,6 @@ import {
   X,
 } from "lucide-react";
 import { api, clock, dateLabel, durationLabel, saved, save, placeText, sunshineWeather, weatherConditionLabel } from "./lib.js";
-import CharacterScene from "./CharacterScene.jsx";
 import { invitationCounts, selectInvitationMoment } from "./invitationExperience.js";
 import { getDirectionsUrl } from "./spotSearch.js";
 import { useLanguage } from "./Language.jsx";
@@ -30,11 +29,6 @@ export default function Invite({ id }) {
     () => saved(`rsvp:${id}`)?.answer || "yes",
   );
   const [sent, setSent] = useState(false);
-  const [responseConfirmation, setResponseConfirmation] = useState(0);
-  const [createdNow] = useState(() => {
-    try { return sessionStorage.getItem(`sunspot:created-invite:${id}`) === "1"; }
-    catch { return false; }
-  });
   const [weatherSnapshot, setWeatherSnapshot] = useState(null);
   const hostToken = saved(`host:${id}`);
   const startsAt = g?.startsAt;
@@ -62,11 +56,6 @@ export default function Invite({ id }) {
     load(controller.signal);
     return () => controller.abort();
   }, [load]);
-  useEffect(() => {
-    if (!createdNow) return;
-    try { sessionStorage.removeItem(`sunspot:created-invite:${id}`); }
-    catch { /* Optional animation handoff may be unavailable. */ }
-  }, [createdNow, id]);
   useEffect(() => {
     if (!startsAt || !active) return;
     let controller;
@@ -115,7 +104,6 @@ export default function Invite({ id }) {
       const refreshed = await load();
       if (!refreshed) return;
       setSent(true);
-      setResponseConfirmation((value) => value + 1);
     } catch (e) {
       setError(e);
     } finally {
@@ -150,8 +138,6 @@ export default function Invite({ id }) {
   const weather = weatherSnapshot?.startsAt === startsAt ? weatherSnapshot?.weather : null;
   const condition = sunshineWeather(weather, startsAt);
   const counts = invitationCounts(g);
-  // Show nine people; use a grouped attendee view if large gatherings become common.
-  const visibleYes = Math.min(counts.yes, 9);
   const moment = selectInvitationMoment({ invitation: g, weather, loading: weatherLoading, responded: sent || Boolean(saved(`rsvp:${id}`)?.editToken) });
   const situation = moment.id.replace("invite-", "");
   const copyKey = situation === "sun" && !g?.host ? "experience.invite.sunAnonymous" : `experience.invite.${situation}`;
@@ -181,7 +167,7 @@ export default function Invite({ id }) {
           </>
         ) : (
           <>
-            <div className="invite-character-heading">
+            <div className="invite-heading">
               <div>
                 <span className="eyebrow">
                   {g.cancelled ? t("flows.invite.cancelled") : t("flows.invite.kicker")}
@@ -190,16 +176,6 @@ export default function Invite({ id }) {
                 <p className="invite-intro">
                   {t("flows.invite.host", { host: g.host })}{" "}<strong>{g.place.name}</strong>.
                 </p>
-              </div>
-              <div className="invite-cast">
-                <CharacterScene
-                  moment={moment}
-                  animate
-                  companion={situation === "created" ? "stripes" : undefined}
-                  confirmation={responseConfirmation > 0
-                    ? `rsvp:${responseConfirmation}`
-                    : situation === "created" && createdNow ? `created:${id}` : undefined}
-                />
               </div>
             </div>
             <p className="invite-moment-copy" data-invitation-state={moment.id}>
@@ -239,14 +215,6 @@ export default function Invite({ id }) {
               <span>{t("flows.invite.maybeCount", { count: counts.maybe })}</span>
               <span>{t("flows.invite.noCount", { count: counts.no })}</span>
             </div>
-            {counts.yes > 0 && !g.cancelled && (
-              <div className="rsvp-people" aria-hidden="true">
-                {Array.from({ length: visibleYes }, (_, index) => (
-                  <CharacterScene key={index} moment={{ id: "invite-responses", character: "blue-coat" }} sizes="96px" />
-                ))}
-                {counts.yes > visibleYes && <span>{t("experience.invite.moreYes", { count: counts.yes - visibleYes })}</span>}
-              </div>
-            )}
             {situation === "responses" && !g.cancelled && g.place && (
               <a className="primary wide invite-next-action" href={getDirectionsUrl(g.place)} target="_blank" rel="noreferrer">
                 {t("experience.invite.directions")} <Navigation size={18} />
@@ -272,15 +240,14 @@ export default function Invite({ id }) {
                   <legend>{t("flows.invite.question")}</legend>
                   <div className="answer-options">
                     {[
-                      ["yes", t("flows.invite.yes"), "puffer"],
-                      ["maybe", t("flows.invite.maybe"), "green-jacket"],
-                      ["no", t("flows.invite.no"), "turtleneck"],
-                    ].map(([value, label, character]) => (
+                      ["yes", t("flows.invite.yes")],
+                      ["maybe", t("flows.invite.maybe")],
+                      ["no", t("flows.invite.no")],
+                    ].map(([value, label]) => (
                       <label
                         className={answer === value ? "chosen" : ""}
                         key={value}
                       >
-                        <CharacterScene moment={{ id: `invite-answer-${value}`, character }} />
                         <span>
                           <input
                             type="radio"
