@@ -28,6 +28,7 @@
 .detail-heading > div { grid-column: 1; }
 .experience-action { min-height: 36px; padding: 0; color: var(--blue); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
 .opening-active::after { content: ""; position: absolute; inset: 0; z-index: 620; background: #0b171bd1; pointer-events: none; }
+.finder-workspace.opening-active .spot-finder { position: fixed; top: 50%; left: 50%; right: auto; bottom: auto; width: min(340px, calc(100vw - 24px)); transform: translate(-50%, -50%); }
 .opening-active .spot-finder form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 8px; }
 .opening-active .opening-intro, .opening-active .finder-notice, .opening-active .golden-discovery { grid-column: 1 / -1; }
 .opening-active .finder-edit-row { grid-column: 1; grid-row: 2; }
