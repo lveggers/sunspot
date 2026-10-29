@@ -7,14 +7,18 @@ import {
   Clock3,
   Copy,
   MapPin,
-  Sun,
+  Navigation,
   Users,
   X,
 } from "lucide-react";
-import { api, clock, dateLabel, durationLabel, saved, save } from "./lib.js";
-import { activityNames } from "./places.js";
+import { api, clock, dateLabel, durationLabel, saved, save, placeText, sunshineWeather, weatherConditionLabel } from "./lib.js";
+import { invitationCounts, selectInvitationMoment } from "./invitationExperience.js";
+import { getDirectionsUrl } from "./spotSearch.js";
+import { useLanguage } from "./Language.jsx";
+import "./invitation-experience.css";
 
 export default function Invite({ id }) {
+  const { language, t, errorText } = useLanguage();
   const [g, setG] = useState(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -25,7 +29,10 @@ export default function Invite({ id }) {
     () => saved(`rsvp:${id}`)?.answer || "yes",
   );
   const [sent, setSent] = useState(false);
+  const [weatherSnapshot, setWeatherSnapshot] = useState(null);
   const hostToken = saved(`host:${id}`);
+  const startsAt = g?.startsAt;
+  const active = Boolean(g && !g.cancelled);
   const load = useCallback(
     (signal) =>
       api(`/gatherings/${id}`, {
@@ -36,9 +43,11 @@ export default function Invite({ id }) {
           if (signal?.aborted) return;
           setG(data);
           setError("");
+          return data;
         })
         .catch((error) => {
-          if (!signal?.aborted) setError(error.message);
+          if (!signal?.aborted) setError(error);
+          return null;
         }),
     [id, hostToken],
   );
@@ -47,6 +56,34 @@ export default function Invite({ id }) {
     load(controller.signal);
     return () => controller.abort();
   }, [load]);
+  useEffect(() => {
+    if (!startsAt || !active) return;
+    let controller;
+    const refresh = () => {
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      api("/weather", { signal: request.signal })
+        .then((weather) => {
+          if (!request.signal.aborted) setWeatherSnapshot({ startsAt, weather });
+        })
+        .catch((error) => {
+          if (!request.signal.aborted && error.name !== "AbortError")
+            setWeatherSnapshot({ startsAt, weather: { available: false } });
+        });
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    refresh();
+    const timer = setInterval(visible, 10 * 60_000);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      controller?.abort();
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [startsAt, active]);
   async function respond(event) {
     event.preventDefault();
     setBusy(true);
@@ -62,12 +99,13 @@ export default function Invite({ id }) {
       });
       if (!save(`rsvp:${id}`, { name, answer, editToken: result.editToken }))
         throw new Error(
-          "Svaret sparades, men webbläsaren kan inte spara behörigheten att ändra det.",
+          "flows.invite.storage",
         );
-      await load();
+      const refreshed = await load();
+      if (!refreshed) return;
       setSent(true);
     } catch (e) {
-      setError(e.message);
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -82,7 +120,7 @@ export default function Invite({ id }) {
       });
       await load();
     } catch (e) {
-      setError(e.message);
+      setError(e);
     } finally {
       setBusy(false);
       setConfirmCancel(false);
@@ -93,66 +131,105 @@ export default function Invite({ id }) {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
     } catch {
-      setError("Kopiera länken från fältet nedan.");
+      setError("flows.invite.copyFallback");
     }
   }
+  const weatherLoading = active && weatherSnapshot?.startsAt !== startsAt;
+  const weather = weatherSnapshot?.startsAt === startsAt ? weatherSnapshot?.weather : null;
+  const condition = sunshineWeather(weather, startsAt);
+  const counts = invitationCounts(g);
+  const moment = selectInvitationMoment({ invitation: g, weather, loading: weatherLoading, responded: sent || Boolean(saved(`rsvp:${id}`)?.editToken) });
+  const situation = moment.id.replace("invite-", "");
+  const copyKey = situation === "sun" && !g?.host ? "experience.invite.sunAnonymous" : `experience.invite.${situation}`;
+  const shareSection = g && (
+    <div className="share-section">
+      <label htmlFor="invite-url">{t("flows.invite.link")}</label>
+      <div className="copy-row">
+        <input id="invite-url" readOnly value={window.location.href} onFocus={(e) => e.target.select()} />
+        <button onClick={copy} aria-label={t("flows.invite.copy")}>
+          {copied ? <Check size={18} /> : <Copy size={18} />}
+        </button>
+      </div>
+      <p className="fineprint">{t("flows.invite.local")}</p>
+    </div>
+  );
   return (
     <main className="invite-page">
       <Link className="back-link" href="/">
-        <ArrowLeft size={17} /> Tillbaka till kartan
+        <ArrowLeft size={17} />
+        {t("flows.invite.back")}
       </Link>
       <div className="invite-card">
-        <div className="invite-sun">
-          <Sun size={34} />
-        </div>
         {!g ? (
           <>
-            <h1>{error ? "Inbjudan saknas" : "Hämtar din inbjudan…"}</h1>
-            <p role="alert">{error}</p>
+            <h1>{error ? t("flows.invite.missing") : t("flows.invite.loading")}</h1>
+            <p role="alert">{errorText(error)}</p>
           </>
         ) : (
           <>
-            <span className="eyebrow">
-              {g.cancelled ? "TRÄFFEN ÄR INSTÄLLD" : "EN STUND TILLSAMMANS"}
-            </span>
-            <h1>{activityNames[g.activity]}.</h1>
-            <p className="invite-intro">
-              {g.host} bjuder in dig till <strong>{g.place.name}</strong>.
+            <div className="invite-heading">
+              <div>
+                <span className="eyebrow">
+                  {g.cancelled ? t("flows.invite.cancelled") : t("flows.invite.kicker")}
+                </span>
+                <h1>{t(`flows.activity.${g.activity}`)}.</h1>
+                <p className="invite-intro">
+                  {t("flows.invite.host", { host: g.host })}{" "}<strong>{g.place.name}</strong>.
+                </p>
+              </div>
+            </div>
+            <p className="invite-moment-copy" data-invitation-state={moment.id}>
+              {t(copyKey, { hostName: g.host, time: clock(new Date(g.startsAt)), placeName: g.place?.name || t("experience.invite.placeFallback"), yesCount: counts.yes, maybeCount: counts.maybe, noCount: counts.no })}
             </p>
+            {g.isHost && !g.cancelled && shareSection}
             <div className="invite-facts">
               <p>
                 <CalendarDays size={19} />
-                {dateLabel(g.startsAt)}
+                {dateLabel(g.startsAt, language)}
               </p>
               <p>
                 <Clock3 size={19} />
                 {clock(new Date(g.startsAt))}–
                 {clock(new Date(Date.parse(g.startsAt) + g.duration * 60_000))}{" "}
-                · {durationLabel(g.duration)} · Köpenhamnstid
-              </p>
+                · {durationLabel(g.duration, language)}{" "}{t("flows.invite.timezone")}</p>
               <p>
                 <MapPin size={19} />
-                {g.place.meeting}
+                {placeText(g.place, "meeting", language)}
               </p>
             </div>
+            {!g.cancelled && (
+              <p className="invite-weather" role="status">
+                {t("experience.invite.forecast", {
+                  date: dateLabel(g.startsAt, language),
+                  time: clock(new Date(g.startsAt)),
+                  condition: weatherLoading ? t("experience.invite.weatherLoading") : weather?.stale ? t("experience.invite.weatherStale") : weatherConditionLabel(condition, language),
+                })}
+              </p>
+            )}
             {g.message && <blockquote>{g.message}</blockquote>}
             <div className="rsvp-counts">
               <span>
                 <Check size={16} />
-                {g.counts.yes} kommer
+                {t("flows.invite.yesCount", { count: counts.yes })}
               </span>
-              <span>{g.counts.maybe} kanske</span>
-              <span>{g.counts.no} kan inte</span>
+              <span>{t("flows.invite.maybeCount", { count: counts.maybe })}</span>
+              <span>{t("flows.invite.noCount", { count: counts.no })}</span>
             </div>
+            {situation === "responses" && !g.cancelled && g.place && (
+              <a className="primary wide invite-next-action" href={getDirectionsUrl(g.place)} target="_blank" rel="noreferrer">
+                {t("experience.invite.directions")} <Navigation size={18} />
+              </a>
+            )}
+            {g.cancelled && <Link href="/" className="secondary wide invite-next-action">{t("experience.invite.newInvitation")}</Link>}
             {!g.cancelled && (
               <form onSubmit={respond} className="rsvp-form">
-                <label htmlFor="guest-name">Ditt namn</label>
+                <label htmlFor="guest-name">{t("flows.invite.name")}</label>
                 <input
                   id="guest-name"
                   autoComplete="given-name"
                   required
                   maxLength={50}
-                  placeholder="Vad heter du?"
+                  placeholder={t("flows.invite.namePlaceholder")}
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -160,69 +237,52 @@ export default function Invite({ id }) {
                   }}
                 />
                 <fieldset>
-                  <legend>Kan du komma?</legend>
+                  <legend>{t("flows.invite.question")}</legend>
                   <div className="answer-options">
                     {[
-                      ["yes", "Jag kommer"],
-                      ["maybe", "Kanske"],
-                      ["no", "Kan inte"],
+                      ["yes", t("flows.invite.yes")],
+                      ["maybe", t("flows.invite.maybe")],
+                      ["no", t("flows.invite.no")],
                     ].map(([value, label]) => (
                       <label
                         className={answer === value ? "chosen" : ""}
                         key={value}
                       >
-                        <input
-                          type="radio"
-                          name="answer"
-                          value={value}
-                          checked={answer === value}
-                          onChange={() => {
-                            setAnswer(value);
-                            setSent(false);
-                          }}
-                        />
-                        {label}
+                        <span>
+                          <input
+                            type="radio"
+                            name="answer"
+                            value={value}
+                            checked={answer === value}
+                            onChange={() => {
+                              setAnswer(value);
+                              setSent(false);
+                            }}
+                          />
+                          {label}
+                        </span>
                       </label>
                     ))}
                   </div>
                 </fieldset>
                 <button className="primary wide" disabled={busy}>
-                  {busy ? "Sparar…" : sent ? "Svar sparat" : "Spara mitt svar"}
+                  {busy ? t("flows.invite.saving") : sent ? t("flows.invite.saved") : t("flows.invite.saveAnswer")}
                   {sent ? <Check size={18} /> : <Users size={18} />}
                 </button>
               </form>
             )}
             {sent && (
-              <p className="success" role="status">
-                Ditt svar är sparat. Du kan ändra det i den här webbläsaren.
-              </p>
+              <p className="success" role="status">{t("flows.invite.success")}</p>
             )}
             {error && (
               <p className="error" role="alert">
-                {error}
+                {errorText(error)}
               </p>
             )}
-            <div className="share-section">
-              <label htmlFor="invite-url">Inbjudningslänk</label>
-              <div className="copy-row">
-                <input
-                  id="invite-url"
-                  readOnly
-                  value={window.location.href}
-                  onFocus={(e) => e.target.select()}
-                />
-                <button onClick={copy} aria-label="Kopiera inbjudningslänk">
-                  {copied ? <Check size={18} /> : <Copy size={18} />}
-                </button>
-              </div>
-              <p className="fineprint">
-                Lokal förhandsvisning: länken fungerar på den här datorn. Extern
-                delning kräver att SunSpot publiceras.
-              </p>
-            </div>
+            {(!g.isHost || g.cancelled) && shareSection}
             {g.isHost && (
               <section className="host-section">
-                <h2>Du är värd</h2>
+                <h2>{t("flows.invite.hostHeading")}</h2>
                 {g.answers.length ? (
                   <ul>
                     {g.answers.map((r, i) => (
@@ -230,7 +290,7 @@ export default function Invite({ id }) {
                         <span>{r.name}</span>
                         <b>
                           {
-                            { yes: "Kommer", maybe: "Kanske", no: "Kan inte" }[
+                            { yes: t("flows.invite.attending"), maybe: t("flows.invite.maybe"), no: t("flows.invite.no") }[
                               r.answer
                             ]
                           }
@@ -239,24 +299,19 @@ export default function Invite({ id }) {
                     ))}
                   </ul>
                 ) : (
-                  <p>
-                    Inga svar ännu. Öppna länken i ett annat webbläsarfönster
-                    för att prova.
-                  </p>
+                  <p>{t("flows.invite.noAnswers")}</p>
                 )}
                 {!g.cancelled &&
                   (confirmCancel ? (
                     <div className="cancel-confirm">
-                      <p>Ställa in träffen för alla?</p>
+                      <p>{t("flows.invite.confirmCancel")}</p>
                       <button
                         className="danger"
                         disabled={busy}
                         onClick={cancel}
-                      >
-                        Ja, ställ in
+                      >{t("flows.invite.cancelYes")}
                       </button>
-                      <button onClick={() => setConfirmCancel(false)}>
-                        Behåll träffen
+                      <button onClick={() => setConfirmCancel(false)}>{t("flows.invite.keep")}
                       </button>
                     </div>
                   ) : (
@@ -264,15 +319,13 @@ export default function Invite({ id }) {
                       className="text-button"
                       onClick={() => setConfirmCancel(true)}
                     >
-                      <X size={15} /> Ställ in träffen
+                      <X size={15} />
+                      {t("flows.invite.cancel")}
                     </button>
                   ))}
               </section>
             )}
-            <p className="fineprint">
-              Platsens solfönster är exempeldata. Träffen är ingen
-              bordsreservation.
-            </p>
+            <p className="fineprint">{t("flows.invite.disclaimer")}</p>
           </>
         )}
       </div>

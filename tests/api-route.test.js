@@ -149,3 +149,27 @@ test("Next API weather errors are explicit and rate budget does not trust forwar
     api.db.close();
   }
 });
+
+test("explicit development aliases preserve exact-origin checks", async () => {
+  const api = createApi({
+    origin: ["http://localhost:3085", "http://127.0.0.1:3085"],
+  });
+  try {
+    for (const origin of ["http://localhost:3085", "http://127.0.0.1:3085"])
+      assert.equal(
+        (await api.handle(request("/gatherings", {}, { origin }))).status,
+        400,
+      );
+    for (const origin of [
+      "https://example.com",
+      "http://localhost:9999",
+      "http://0.0.0.0:3085",
+    ])
+      assert.equal(
+        (await api.handle(request("/gatherings", {}, { origin }))).status,
+        403,
+      );
+  } finally {
+    api.db.close();
+  }
+});

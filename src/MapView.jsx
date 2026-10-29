@@ -2,21 +2,24 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { mapColors } from "./theme.js";
 import { Plus, Minus, LocateFixed, Layers, Info } from "lucide-react";
-import { groupMapMarkers } from "./mapMarkers.js";
+import { groupMapMarkers, sunFocusPoints } from "./mapMarkers.js";
 import { atHour } from "./lib.js";
+import { useLanguage } from "./Language.jsx";
 
 import * as SunCalc from "suncalc";
-import BuildingShadowLayer from "./BuildingShadowLayer.js";
-import { parkFocusLayer, fitParkView } from "./ParkFocusLayer.js";
-import { venueFocusLayer, fitPlacesView } from "./VenueFocusLayer.js";
-import { places as allPlaces } from "./places.js";
+import { hasParkArea, fitParkView } from "./ParkFocusLayer.js";
+import { fitPlacesView } from "./VenueFocusLayer.js";
+import "./map-sun-focus.css";
 
 export default function MapView({
   pending = false,
-  category = "all",
+  weatherState = "unknown",
+  categories = ["park", "bar", "restaurant"],
+  focusResults = false,
+  fitResultsToken = 0,
   viewReset = 0,
   places,
-  events = [],
+  focusPlaces = places,
   selected,
   onSelect,
   date,
@@ -32,19 +35,27 @@ export default function MapView({
   seatError,
   children,
 }) {
-  const touchgrass = category === "park";
-  const venueFocus = category === "bar" || category === "restaurant";
+  const { language, t, errorText } = useLanguage();
+  const touchgrass =
+    focusResults &&
+    categories.length === 1 &&
+    categories[0] === "park" &&
+    places.every(hasParkArea);
+  const venueFocus = focusResults && !touchgrass;
   const container = useRef(null),
     map = useRef(null),
     layer = useRef(null);
-  const shadowLayer = useRef(null);
+  const colorPane = useRef(null);
   const seatLayer = useRef(null);
   const markers = useRef(new Map());
   const lastPlaces = useRef([]);
+  const fittedRequest = useRef({ fitResultsToken, viewReset });
   const [toolsOpen, setToolsOpen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
-  const [zones, setZones] = useState(true),
-    [tileError, setTileError] = useState(false);
+  const [tileError, setTileError] = useState(false);
+  const instant = atHour(date, hour);
+  const altitude = SunCalc.getPosition(instant, 55.6865, 12.581).altitude;
+  const daylight = altitude > 0;
   useEffect(() => {
     const m = L.map(container.current, {
       zoomControl: false,
@@ -62,6 +73,17 @@ export default function MapView({
     })
       .on("tileerror", () => setTileError(true))
       .addTo(m);
+    const pane = m.createPane("sunFocusColor");
+    pane.classList.add("sun-focus-color-pane");
+    pane.style.pointerEvents = "none";
+    pane.style.visibility = "hidden";
+    pane.style.clipPath = "inset(0 100% 100% 0)";
+    pane.dataset.activeCount = "0";
+    colorPane.current = pane;
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      pane: "sunFocusColor",
+      maxZoom: 19,
+    }).addTo(m);
     layer.current = L.layerGroup().addTo(m);
     seatLayer.current = L.layerGroup().addTo(m);
     const observer = new ResizeObserver(() => m.invalidateSize());
@@ -71,12 +93,14 @@ export default function MapView({
       m.remove();
       registry.clear();
       map.current = null;
+      colorPane.current = null;
     };
   }, []);
   useEffect(() => {
     if (!map.current) return;
     const m = map.current;
     const registry = markers.current;
+    const sunny = new Set(sunFocusPoints(focusPlaces, results, { pending, weatherState, daylight }).map((p) => p.id));
     if (!pending) lastPlaces.current = places;
     const update = () => {
       const zoom = m.getZoom();
@@ -84,16 +108,14 @@ export default function MapView({
       const items = editing
         ? []
         : groupMapMarkers(
-            [
-              ...(pending ? lastPlaces.current : places).map((p) => {
-                const point = results[p.id]?.point;
-                return point ? { ...p, lat: point[1], lng: point[0] } : p;
-              }),
-              ...events,
-            ],
+            (pending ? lastPlaces.current : places).map((p) => {
+              const point = results[p.id]?.point;
+              return point ? { ...p, lat: point[1], lng: point[0] } : p;
+            }),
             {
               project: (p) => m.project([p.lat, p.lng], zoom),
               zoom,
+              language,
               selectedId: selected?.id,
               bounds: {
                 south: bounds.getSouth(),
@@ -112,6 +134,7 @@ export default function MapView({
       }
       for (const p of items) {
         const active = selected?.id === p.id;
+        const confirmedSun = p.members ? p.members.some((member) => sunny.has(member.id)) : sunny.has(p.id);
         const compact = !active && zoom < 16;
         let record = registry.get(p.markerId);
         if (!record) {
@@ -147,25 +170,23 @@ export default function MapView({
           registry.set(p.markerId, record);
         }
         record.item = p;
-        const signature = `${p.name}|${p.emoji}|${active}|${compact}|${results[p.id]?.state}|${p.members?.length}`;
+        const signature = `${language}|${p.name}|${p.emoji}|${active}|${compact}|${confirmedSun}|${p.members?.length}`;
         if (signature !== record.signature) {
-          record.button.className = `place-pin ${p.members ? "cluster-pin" : ""} ${p.category === "event" ? "event-pin" : ""} ${active ? "active" : ""} ${results[p.id]?.state === "sun" ? "sunny" : ""} ${compact && !p.members ? "compact" : ""}`;
+          record.button.className = `place-pin ${p.members ? "cluster-pin" : ""} ${active ? "active" : ""} ${confirmedSun ? "sunny" : ""} ${compact && !p.members ? "compact" : ""}`;
           record.button.setAttribute(
             "aria-label",
-            p.members ? `Zooma in: ${p.name}` : `Visa ${p.name}`,
+            t(p.members ? "map.groupZoom" : "map.showPlace", { name: p.name }),
           );
           record.button.title = p.members
-            ? `${p.name} · tryck för att zooma`
+            ? t("map.groupHint", { name: p.name })
             : p.name;
           record.button.dataset.id = p.id;
           record.emoji.textContent = p.emoji;
           record.name.textContent = p.members ? p.members.length : p.name;
-          record.marker.setZIndexOffset(
-            active ? 1000 : p.category === "event" ? 800 : 0,
-          );
+          record.marker.setZIndexOffset(active ? 1000 : 0);
           record.signature = signature;
         }
-        record.button.hidden = pending && p.category !== "event";
+        record.button.hidden = pending;
         const current = record.marker.getLatLng();
         if (current.lat !== p.lat || current.lng !== p.lng)
           record.marker.setLatLng([p.lat, p.lng]);
@@ -174,10 +195,10 @@ export default function MapView({
     update();
     m.on("moveend zoomend resize", update);
     return () => m.off("moveend zoomend resize", update);
-  }, [places, events, selected, results, onSelect, editing, pending]);
+  }, [places, focusPlaces, selected, results, onSelect, editing, pending, weatherState, daylight, language, t]);
   useEffect(() => {
     if (selected?.greenSpace && touchgrass && map.current) {
-      fitParkView(map.current, selected.id);
+      fitParkView(map.current, places, selected.id);
       return;
     }
     if (
@@ -186,6 +207,8 @@ export default function MapView({
       !map.current.getBounds().pad(-0.1).contains([selected.lat, selected.lng])
     )
       map.current.panTo([selected.lat, selected.lng]);
+    // Selecting a place changes the view; updated result batches do not.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, touchgrass]);
   useEffect(() => {
     if (!map.current) return;
@@ -199,10 +222,12 @@ export default function MapView({
         fillColor: colors.blue,
         fillOpacity: 1,
       })
-        .bindTooltip("Beräkningspunkt / din sittplats")
+        .bindTooltip(t("map.seatTooltip"))
         .addTo(seatLayer.current);
     }
-    if (!editing) return;
+  }, [point, touchgrass, t]);
+  useEffect(() => {
+    if (!map.current || !editing) return;
     const m = map.current;
     container.current.scrollIntoView({ block: "center", behavior: "smooth" });
     m.setView(point ? [point[1], point[0]] : [selected.lat, selected.lng], 18);
@@ -215,86 +240,58 @@ export default function MapView({
     };
   }, [point, editing, selected, onPointChange, touchgrass]);
   useEffect(() => {
-    if (!buildings || !zones || !map.current) return;
-    const shadows = new BuildingShadowLayer(
-      buildings,
-      atHour(date, hour),
-    ).addTo(map.current);
-    shadowLayer.current = shadows;
-    return () => {
-      shadows.remove();
-      shadowLayer.current = null;
-    };
-    // Time changes update the existing layer, preserving its projection cache.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildings, zones]);
-  useEffect(() => {
-    shadowLayer.current?.setInstant(atHour(date, hour));
-  }, [date, hour]);
-  useEffect(() => {
-    if (!touchgrass || !map.current) return;
-    const focus = parkFocusLayer(map.current, selected?.id, onSelect).addTo(
-      map.current,
-    );
-    return () => focus.remove();
-  }, [touchgrass, selected?.id, onSelect]);
-  useEffect(() => {
-    if (!touchgrass || !map.current) return;
+    if (!map.current || !colorPane.current) return;
     const m = map.current;
-    const fit = () => fitParkView(m);
-    const frame = requestAnimationFrame(() => {
-      m.invalidateSize();
-      fit();
-    });
-    m.on("resize", fit);
-    return () => {
-      cancelAnimationFrame(frame);
-      m.off("resize", fit);
+    const pane = colorPane.current;
+    const points = sunFocusPoints(focusPlaces, results, { pending, weatherState, daylight });
+    const update = () => {
+      // Screen-space windows reveal place context, not measured sunlight boundaries.
+      const radius = 54;
+      pane.style.width = `${m.getSize().x}px`;
+      pane.style.height = `${m.getSize().y}px`;
+      const path = points.map(({ lat, lng }) => {
+        const p = m.latLngToLayerPoint([lat, lng]);
+        return `M${p.x - radius},${p.y}a${radius},${radius} 0 1,0 ${radius * 2},0a${radius},${radius} 0 1,0 ${-radius * 2},0Z`;
+      }).join(" ");
+      pane.style.clipPath = path ? `path('${path}')` : "inset(0 100% 100% 0)";
+      pane.style.visibility = points.length ? "" : "hidden";
+      pane.dataset.activeCount = String(points.length);
+      pane.dataset.weatherState = weatherState;
+      pane.dataset.zoom = String(m.getZoom());
     };
-  }, [touchgrass]);
-  useEffect(() => {
-    if (!venueFocus || editing || !map.current) return;
-    const focus = venueFocusLayer(map.current, places, results).addTo(
-      map.current,
-    );
-    return () => focus.remove();
-  }, [venueFocus, editing, places, results]);
-  useEffect(() => {
-    if (!venueFocus || !map.current) return;
-    const m = map.current;
-    const fit = () =>
-      fitPlacesView(
-        m,
-        allPlaces.filter((p) => p.category === category),
-      );
-    const frame = requestAnimationFrame(() => {
-      m.invalidateSize();
-      fit();
-    });
-    m.on("resize", fit);
+    const hide = () => { pane.style.visibility = "hidden"; };
+    update();
+    m.on("moveend zoomend resize viewreset", update);
+    m.on("zoomstart", hide);
     return () => {
-      cancelAnimationFrame(frame);
-      m.off("resize", fit);
+      m.off("moveend zoomend resize viewreset", update);
+      m.off("zoomstart", hide);
     };
-  }, [category, venueFocus]);
+  }, [focusPlaces, results, pending, weatherState, daylight]);
   useEffect(() => {
-    if (viewReset && map.current) fitPlacesView(map.current, allPlaces);
-  }, [viewReset]);
-  const altitude = SunCalc.getPosition(
-    atHour(date, hour),
-    55.6865,
-    12.581,
-  ).altitude;
+    if (!map.current || pending) return;
+    const previous = fittedRequest.current;
+    if (
+      previous.fitResultsToken === fitResultsToken &&
+      previous.viewReset === viewReset
+    )
+      return;
+    fittedRequest.current = { fitResultsToken, viewReset };
+    if (touchgrass) fitParkView(map.current, places);
+    else fitPlacesView(map.current, places);
+  }, [fitResultsToken, viewReset, pending, places, touchgrass]);
   return (
     <section
-      className={`map-shell ${editing ? "editing" : ""} ${touchgrass ? "touchgrass" : ""} ${venueFocus ? `venue-focus ${category}` : ""}`}
-      data-category={category}
-      aria-label="Karta över platser i Köpenhamn"
+      className={`map-shell ${editing ? "editing" : ""} ${touchgrass ? "touchgrass" : ""} ${venueFocus ? "venue-focus" : ""}`}
+      data-categories={categories.join(" ")}
+      data-instant={instant.toISOString()}
+      data-daylight={daylight}
+      aria-label={t("map.region")}
     >
-      <div ref={container} className="map" />
+      <div ref={container} className="map sun-focus-map" data-sun-focus-enabled={!pending && weatherState === "sun" && daylight} />
       <button
         className="map-tools-toggle"
-        aria-label="Kartverktyg"
+        aria-label={t("map.tools")}
         aria-expanded={toolsOpen}
         onClick={() => setToolsOpen((v) => !v)}
       >
@@ -302,40 +299,26 @@ export default function MapView({
       </button>
       <div className={`map-tools ${toolsOpen ? "is-open" : ""}`}>
         <div className="map-controls">
-          <button onClick={() => map.current?.zoomIn()} aria-label="Zooma in">
+          <button onClick={() => map.current?.zoomIn()} aria-label={t("map.zoomIn")}>
             <Plus size={19} />
           </button>
-          <button onClick={() => map.current?.zoomOut()} aria-label="Zooma ut">
+          <button onClick={() => map.current?.zoomOut()} aria-label={t("map.zoomOut")}>
             <Minus size={19} />
           </button>
           <button
             onClick={() =>
               touchgrass
-                ? map.current && fitParkView(map.current)
-                : map.current &&
-                  fitPlacesView(
-                    map.current,
-                    allPlaces.filter(
-                      (p) => category === "all" || p.category === category,
-                    ),
-                  )
+                ? map.current && fitParkView(map.current, places)
+                : map.current && fitPlacesView(map.current, places)
             }
-            aria-label="Visa hela området"
+            aria-label={t("map.showArea")}
           >
             <LocateFixed size={19} />
           </button>
         </div>
         <div className="map-layer-controls">
           <button
-            className={zones ? "on" : ""}
-            onClick={() => setZones(!zones)}
-            aria-label="Byggnadsskuggor"
-            aria-pressed={zones}
-          >
-            <Layers size={17} /> Skuggor
-          </button>
-          <button
-            aria-label="Om kartan"
+            aria-label={t("map.about")}
             aria-expanded={legendOpen}
             onClick={() => setLegendOpen((open) => !open)}
           >
@@ -343,48 +326,37 @@ export default function MapView({
           </button>
         </div>
       </div>
-      {zones && (legendOpen || dataError) && (
+      {(legendOpen || dataError) && (
         <div className="zone-note shadow-legend" role="status">
           {dataError ? (
             <>
-              <strong>Skuggdata kunde inte laddas.</strong>
-              <button onClick={onRetry}>Försök igen</button>
+              <strong>{t("map.dataFailed")}</strong>
+              <button onClick={onRetry}>{t("common.retry")}</button>
             </>
           ) : !buildings ? (
-            <strong>Laddar byggnader…</strong>
+            <strong>{t("map.buildingsLoading")}</strong>
           ) : (
             <>
               <strong>
-                <i className="shadow-swatch" />
+                <i className="sun-focus-swatch" />
                 {altitude <= 0
-                  ? "Solen är under horisonten"
+                  ? t("map.sunBelow")
                   : altitude < 5
-                    ? "Solen är för låg för skuggmodellen"
-                    : "Mörkt = beräknad byggnadsskugga"}
+                    ? t("map.sunLow")
+                    : t("map.sunFocusTitle")}
               </strong>
-              {touchgrass && (
-                <span>
-                  <i className="park-swatch" />
-                  Grönt = markerad parkyta
-                </span>
-              )}
-              <span>Höjder delvis uppskattade · träd ingår inte</span>
-              {altitude > 0 && (
-                <span>
-                  <i className="coverage-swatch" />
-                  Streckat = utanför modellens täckning
-                </span>
-              )}
-              <span>Ändra dag och tid för att följa skuggorna.</span>
+              <span>{t("map.sunFocusConditions")}</span>
+              <span>{t("map.sunFocusContext")}</span>
+              <span>{t("map.heightsNote")}</span>
+              <span>{t("map.changeTime")}</span>
             </>
           )}
         </div>
       )}
       {editing && (
         <div className="seat-prompt" role="status">
-          Tryck på din sittplats utomhus, nära stället. Blå punkt används i
-          beräkningen.
-          {seatError && <p>{seatError}</p>}
+          {t("map.chooseSeat")}
+          {seatError && <p>{errorText(seatError)}</p>}
           <div>
             <button
               onClick={() => {
@@ -392,15 +364,15 @@ export default function MapView({
                 onPointChange([p.lng, p.lat]);
               }}
             >
-              Använd kartans mittpunkt
+              {t("map.useCentre")}
             </button>
-            <button onClick={onCancelEdit}>Avbryt punktval</button>
+            <button onClick={onCancelEdit}>{t("map.cancelPoint")}</button>
           </div>
         </div>
       )}
       {tileError && (
         <div className="map-error" role="status">
-          Kartbilder kunde inte laddas. Platserna finns i listan.
+          {t("map.tilesFailed")}
         </div>
       )}
       {children}

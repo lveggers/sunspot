@@ -1,64 +1,113 @@
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
+
 const browser = await chromium.launch({
   executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined,
 });
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const errors = [];
+const expandFinder = async (target) => {
+  const toggle = target.getByRole("button", {
+    name: "Välj plats och tid",
+    exact: true,
+  });
+  if (await toggle.isVisible()) await toggle.click();
+};
+
+const clearWeather = {
+  available: true,
+  stale: false,
+  timeseries: Array.from({ length: 24 * 8 }, (_, hour) => ({
+    time: new Date(
+      Date.parse("2026-10-27T00:00:00Z") + hour * 3600000,
+    ).toISOString(),
+    data: {
+      instant: {
+        details: { air_temperature: 14, wind_speed: 3, cloud_area_fraction: 5 },
+      },
+      next_1_hours: {
+        summary: { symbol_code: "clearsky_day" },
+        details: { precipitation_amount: 0 },
+      },
+    },
+  })),
+};
+let weatherMode = "sun";
+const weatherFixture = () => {
+  if (weatherMode === "missing") return { available: false };
+  const weather = structuredClone(clearWeather);
+  weather.stale = weatherMode === "stale";
+  for (const row of weather.timeseries) {
+    row.data.instant.details.cloud_area_fraction = weatherMode === "cloud" ? 100 : 5;
+    row.data.next_1_hours.summary.symbol_code = ({ cloud: "cloudy", rain: "rain", unknown: "unclassified" })[weatherMode] || "clearsky_day";
+    row.data.next_1_hours.details.precipitation_amount = weatherMode === "rain" ? 2 : 0;
+  }
+  return weather;
+};
 const ready = async (page) => {
   await page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
-  await page.locator('.building-shadows[data-pending="false"]').waitFor();
+  await expect(page.locator(".sun-focus-color-pane")).toHaveCount(1);
 };
-const checksum = (page) =>
-  page.locator(".building-shadows").evaluate((canvas) => {
-    const pixels = canvas
-      .getContext("2d")
-      .getImageData(0, 0, canvas.width, canvas.height).data;
-    let hash = 2166136261;
-    for (const byte of pixels) hash = Math.imul(hash ^ byte, 16777619);
-    return {
-      hash,
-      alpha: Array.from(pixels).filter((_, i) => i % 4 === 3),
-      width: canvas.width,
-      height: canvas.height,
-      mode: canvas.dataset.mode,
-      buildings: canvas.dataset.buildings,
-    };
-  });
-async function open(fallback = false) {
+const focusCount = (page) => page.locator(".sun-focus-color-pane").evaluate((pane) => Number(pane.dataset.activeCount));
+const view = (page) =>
+  page.locator(".sun-focus-color-pane").evaluate((pane) => ({
+    zoom: pane.dataset.zoom,
+    pane: pane.closest(".leaflet-map-pane").style.transform,
+  }));
+async function open() {
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
-    storageState: process.env.SUNSPOT_STORAGE_STATE || undefined,
     reducedMotion: "reduce",
   });
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.clock.setSystemTime(new Date("2026-09-17T12:00:00Z"));
-  if (fallback)
-    await page.addInitScript(() => {
-      window.OffscreenCanvas = undefined;
-    });
-  await page.route("**/api/events?**", (r) =>
-    r.fulfill({ json: { events: [], available: true, stale: false } }),
+  await page.context().addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.clock.setSystemTime(new Date("2026-10-27T11:00:00Z"));
+  await page.route("**/api/weather", (route) =>
+    route.fulfill({ json: weatherFixture() }),
   );
   await page.goto(base, { waitUntil: "domcontentloaded" });
   await ready(page);
   return page;
 }
+async function filters(page, action) {
+  await page.getByRole("button", { name: "Öppna filter", exact: true }).click();
+  await action();
+  await page
+    .getByRole("button", { name: "Använd filter", exact: true })
+    .click();
+  await ready(page);
+}
 try {
   await mkdir("artifacts", { recursive: true });
   const page = await open();
-  await expect(page.locator(".building-shadows")).toHaveAttribute(
-    "data-renderer",
-    "worker",
-  );
-  const pixels = await checksum(page);
+  await expect(page.locator(".place-pin")).toHaveCount(0);
+  await expect.poll(() => focusCount(page)).toBeGreaterThan(0);
+  await expect(page.locator(".sun-focus-color-pane")).toHaveCSS("pointer-events", "none");
+  await expect(page.locator(".sun-focus-color-pane")).toHaveCSS("filter", "none");
+  assert.match(await page.locator(".leaflet-tile-pane").evaluate((pane) => getComputedStyle(pane).filter), /grayscale\(1\)/);
+  await expect(page.locator(".building-shadows, .venue-focus-veil, .park-focus-veil")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Byggnadsskuggor", exact: true })).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Hitta min plats i solen", exact: true })
+    .click();
+  await ready(page);
   const markerCount = await page.locator(".place-pin").count();
   assert.ok(
-    markerCount > 0 && markerCount < 35,
-    `quiet mobile overview: ${markerCount} markers`,
+    markerCount > 0 && markerCount <= 8,
+    `bounded result pins: ${markerCount}`,
   );
-  await expect(page.locator(".cluster-pin").first()).toBeVisible();
+  await expect.poll(() => focusCount(page)).toBeGreaterThan(0);
+  for (const mode of ["cloud", "rain", "unknown", "stale", "missing"]) {
+    weatherMode = mode;
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await expect.poll(() => focusCount(page)).toBe(0);
+    await expect(page.locator(".sun-focus-color-pane")).toHaveCSS("visibility", "hidden");
+    await expect(page.locator(".place-pin.sunny")).toHaveCount(0);
+  }
+  weatherMode = "sun";
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect.poll(() => focusCount(page)).toBeGreaterThan(0);
   await expect(
     page.getByRole("button", { name: "Zooma in", exact: true }),
   ).toBeHidden();
@@ -67,117 +116,169 @@ try {
     page.getByRole("button", { name: "Zooma in", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Kartverktyg", exact: true }).click();
-  await page.screenshot({ path: "artifacts/quiet-map-mobile.png" });
-  // A comparison of the same frame also checks the fallback's geometry and coverage.
-  const fallback = await open(true);
-  await expect(fallback.locator(".building-shadows")).toHaveAttribute(
-    "data-renderer",
-    "main",
-  );
-  const fallbackPixels = await checksum(fallback);
-  const differences = pixels.alpha.map((v, i) =>
-    Math.abs(v - fallbackPixels.alpha[i]),
-  );
-  const rasterDifference = {
-    averageAlpha: differences.reduce((a, b) => a + b, 0) / differences.length,
-    significantPixels:
-      differences.filter((v) => v > 8).length / differences.length,
-  };
-  console.log(JSON.stringify({ rasterDifference }));
-  assert.equal(fallbackPixels.buildings, pixels.buildings);
-  assert.equal(fallbackPixels.mode, pixels.mode);
-  assert.equal(fallbackPixels.width, pixels.width);
-  assert.equal(fallbackPixels.height, pixels.height);
-  assert.ok(
-    rasterDifference.averageAlpha < 1 &&
-      rasterDifference.significantPixels < 0.005,
-    "worker/fallback coverage agrees within canvas anti-aliasing tolerance",
-  );
-  await fallback.close();
-  const cluster = page.locator(".cluster-pin").first();
-  const previousZoom = Number(
-    await page.locator(".building-shadows").getAttribute("data-zoom"),
-  );
-  await cluster.click();
+  const wheelTarget = await page.locator(".leaflet-container").evaluate((map) => {
+    for (let y = 120; y < innerHeight - 120; y += 40) {
+      for (let x = 40; x < innerWidth - 40; x += 40) {
+        const hit = document.elementFromPoint(x, y);
+        if (hit && map.contains(hit)) return { x, y };
+      }
+    }
+    return null;
+  });
+  assert.ok(wheelTarget, "map remains directly reachable for scroll-wheel zoom");
+  const zoomBeforeWheel = Number((await view(page)).zoom);
+  await page.mouse.move(wheelTarget.x, wheelTarget.y);
+  await page.mouse.wheel(0, -480);
+  await expect.poll(async () => Number((await view(page)).zoom)).toBeGreaterThan(zoomBeforeWheel);
+  await page.screenshot({ path: "artifacts/finder-map-mobile.png" });
+
+  // Opt out of availability for a deterministic geometry fixture, then focus one park.
+  await filters(page, async () => {
+    await page
+      .getByRole("checkbox", { name: "Dölj skugga och osäkert solläge" })
+      .uncheck();
+    await page
+      .getByRole("checkbox", { name: "Bara bekräftat öppet enligt OSM" })
+      .uncheck();
+    await page
+      .getByRole("textbox", { name: "Sök plats eller område" })
+      .fill("faelledsparken");
+  });
+  await page
+    .getByRole("button", { name: "Ändra sökning", exact: true })
+    .click();
+  await expandFinder(page);
+  await page.getByRole("button", { name: "Bar", exact: true }).click();
+  await page.getByRole("button", { name: "Mat", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Hitta min plats i solen", exact: true })
+    .click();
   await ready(page);
-  assert.ok(
-    Number(await page.locator(".building-shadows").getAttribute("data-zoom")) >
-      previousZoom,
-    "cluster opens at a closer zoom",
-  );
-  // Every park remains discoverable, even if offscreen or grouped.
-  await page.getByRole("button", { name: "Alla", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Sök plats eller område" })
-    .fill("faelledsparken");
-  await page
-    .getByRole("button", { name: "Visa platslista", exact: true })
-    .click();
-  await page
-    .locator(".place-list")
-    .getByRole("heading", { name: "Fælledparken", exact: true })
-    .click();
+  await expect(page.locator(".detail-card")).toContainText("Fælledparken");
+  await expect(page.locator(".place-pin")).toHaveCount(1);
+  await expect(page.locator(".venue-focus-veil")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Visa Fælledparken", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".detail-card")).toContainText("Fælledparken");
-  await page.getByRole("button", { name: "Stäng plats", exact: true }).click();
-  await page.getByRole("button", { name: "Alla", exact: true }).click();
+  const focusedView = await view(page);
+  await filters(page, () =>
+    page
+      .getByRole("textbox", { name: "Sök plats eller område" })
+      .fill("no-match-anywhere"),
+  );
+  await expect.poll(() => focusCount(page)).toBe(0);
+  await expect(page.locator(".place-pin")).toHaveCount(0);
+  assert.deepEqual(
+    await view(page),
+    focusedView,
+    "filter updates do not fit the map again",
+  );
+  await filters(page, () =>
+    page
+      .getByRole("textbox", { name: "Sök plats eller område" })
+      .fill("faelledsparken"),
+  );
+  await expect(page.locator(".place-pin")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Ändra sökning", exact: true })
+    .click();
   await ready(page);
-  // Observe main-thread responsiveness while dispatching real React range inputs.
+  const beforeWorker = await view(page);
+  await expandFinder(page);
+  await page.getByLabel("Exakt klockslag").fill("13:00");
+  await expect(page.locator(".map-shell")).toHaveAttribute(
+    "data-instant",
+    "2026-10-27T12:00:00.000Z",
+  );
+  await ready(page);
+  assert.deepEqual(
+    await view(page),
+    beforeWorker,
+    "worker updates do not fit the map again",
+  );
+
+  // Dispatch the real time field quickly; the latest requested frame must win.
   const metrics = await page.evaluate(async () => {
     const durations = [];
     const observer = new PerformanceObserver((list) =>
-      durations.push(...list.getEntries().map((e) => e.duration)),
+      durations.push(...list.getEntries().map((entry) => entry.duration)),
     );
     observer.observe({ type: "longtask", buffered: false });
-    const slider = document.querySelector("#time");
+    const input = document.querySelector('input[type="time"]');
     const setter = Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype,
       "value",
     ).set;
-    for (let i = 0; i < 45; i++) {
-      setter.call(slider, 1440 + 600 + i * 10);
-      slider.dispatchEvent(new Event("input", { bubbles: true }));
-      await new Promise((r) => setTimeout(r, 30));
+    for (let index = 0; index < 45; index++) {
+      const minute = 600 + index * 10;
+      setter.call(
+        input,
+        `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`,
+      );
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 30));
     }
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
     observer.disconnect();
     return {
       longTasks: durations.length,
-      longTaskMs: Math.round(durations.reduce((a, b) => a + b, 0)),
+      longTaskMs: Math.round(durations.reduce((sum, value) => sum + value, 0)),
     };
   });
-  await ready(page);
-  await expect(page.locator(".building-shadows")).toHaveAttribute(
+  await expect(page.locator(".map-shell")).toHaveAttribute(
     "data-instant",
-    "2026-09-18T15:20:00.000Z",
+    "2026-10-27T16:20:00.000Z",
   );
-  await page.getByRole("slider", { name: "Dag och tid" }).fill("1440");
   await ready(page);
-  await expect(page.locator(".building-shadows")).toHaveAttribute(
-    "data-mode",
-    "night",
+  assert.deepEqual(
+    await view(page),
+    beforeWorker,
+    "rapid time updates preserve the chosen view",
   );
+  await page.getByLabel("Exakt klockslag").fill("00:00");
+  await ready(page);
+  await expect(page.locator(".map-shell")).toHaveAttribute("data-daylight", "false");
+  await expect.poll(() => focusCount(page)).toBe(0);
+  await filters(page, () =>
+    page.getByRole("textbox", { name: "Sök plats eller område" }).fill(""),
+  );
+  await expandFinder(page);
+  await page
+    .getByRole("combobox", { name: "Var?", exact: true })
+    .selectOption("Kvæsthusbroen");
+  await page
+    .getByRole("button", { name: "Hitta min plats i solen", exact: true })
+    .click();
+  await ready(page);
+  await expect(page.locator(".detail-card")).toContainText("Ofelia Plads");
+  await expect(
+    page.getByRole("button", { name: "Visa Ofelia Plads", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".venue-focus-veil")).toHaveCount(0);
+  await expect(page.locator(".park-focus-outline")).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 667 });
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
+    "small viewport does not scroll sideways",
   );
-  const dock = await page.locator(".time-dock").boundingBox();
-  assert.ok(dock.y + dock.height <= 667);
   assert.deepEqual(errors, []);
   const report = {
     passed: true,
     markerCount,
     ...metrics,
     checks: [
-      "viewport culling and grouping",
-      "search and selection",
+      "initial colour focus with no premature result pins",
+      "bounded result pins",
+      "normal-colour tiles over a faded grayscale base",
+      "cloud/rain/unknown/stale/missing weather never colours the map",
+      "filtered park places",
+      "point-only park fallback",
+      "stable map on filters and workers",
       "mobile tools",
-      "worker/fallback shadow coverage",
-      "latest slider frame",
+      "scroll-wheel zoom remains available through the colour layer",
+      "latest time field frame",
       "night and small viewport",
     ],
   };

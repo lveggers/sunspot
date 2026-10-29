@@ -1,0 +1,59 @@
+.golden-discovery-button > .golden-discovery-copy {
+  flex: 1;
+  min-width: 0;
+}
+.golden-list-intro,
+.golden-offer-summary,
+.golden-voucher-summary,
+.partner-intro {
+  grid-template-columns: minmax(0, 1fr);
+}
+.golden-offer-card > span {
+  flex: 1;
+  min-width: 0;
+}
+.offer-experience-copy {
+  margin: 10px 0;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.golden-voucher .offer-experience-copy {
+  margin-bottom: 0;
+}
+.golden-voucher > .golden-text-button {
+  margin-right: 12px;
+}
+.theatre-example .theatre-example-notification {
+  grid-template-columns: minmax(0, 1fr);
+}
+.theatre-example .theatre-example-weather {
+  position: static;
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 10px;
+  line-height: 1.4;
+}
+@media (max-width: 760px) {
+  .golden-offer-summary h3,
+  .golden-voucher-summary h3 {
+    font-size: 22px;
+  }
+  .golden-offer-detail > .golden-demo {
+    margin-bottom: 6px;
+    padding: 7px;
+    font-size: 9px;
+    line-height: 1.4;
+  }
+  .theatre-example .theatre-example-copy {
+    padding: 0;
+  }
+  .theatre-example .theatre-example-copy > h3 {
+    font-size: 23px;
+  }
+  .theatre-example .theatre-example-deal strong {
+    font-size: 20px;
+  }
+  .theatre-example .theatre-weather-switch {
+    flex-wrap: wrap;
+  }
+}

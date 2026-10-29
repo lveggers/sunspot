@@ -14,9 +14,11 @@
     "data:buildings": "node scripts/import-buildings.mjs",
     "data:parks": "node scripts/import-parks.mjs && npm run data:venues",
     "data:venues": "node scripts/build-venue-data.mjs",
-    "test:events": "node scripts/verify-events.mjs",
-    "data:event-locations": "node scripts/import-event-locations.mjs",
-    "test:map": "node scripts/verify-map-performance.mjs"
+    "test:map": "node scripts/verify-map-performance.mjs",
+    "test:golden-hour": "node scripts/verify-golden-hour.mjs",
+    "test:identity": "node scripts/verify-visual-identity.mjs",
+    "test:language": "node scripts/verify-language.mjs",
+    "test:experience": "node scripts/verify-character-experience.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

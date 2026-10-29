@@ -1,0 +1,60 @@
+.opening-theatre {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: 110px;
+  height: 112px;
+  margin-inline: auto;
+  overflow: hidden;
+  pointer-events: none;
+}
+.opening-theatre[data-scene]::before {
+  content: "";
+  position: absolute;
+  inset: 0 5% auto;
+  height: 2px;
+  background: #877a65;
+  opacity: 0.65;
+}
+.opening-puppet {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  display: block;
+  width: 70px;
+  aspect-ratio: 2 / 3;
+  transform-origin: 50% 0;
+}
+.opening-puppet > .cast-character { width: 100%; }
+.opening-puppet .cast-pose > img { width: 100%; height: 100%; object-fit: contain; }
+.opening-strings {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: #766b59;
+  stroke-width: 1;
+  opacity: 0.8;
+}
+.opening-weather-prop {
+  position: absolute;
+  top: 18px;
+  right: 0;
+  display: block;
+  width: 32px;
+  height: 32px;
+  transform-origin: 50% -25px;
+}
+.opening-weather-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: #69808a;
+  fill: #ced9d6;
+  transform: rotate(-8deg);
+}
+.opening-sun .opening-weather-icon { color: #a78e40; fill: #e8b94d; }
+.opening-moon .opening-weather-icon { color: #7b867f; fill: #ced9d6; }

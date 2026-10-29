@@ -1,145 +1,209 @@
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
-import { places } from "../src/places.js";
+import { mkdir } from "node:fs/promises";
+import { atHour, clock, localDate } from "../src/lib.js";
+import { assertCharacterScope } from "./verify-character-motion.mjs";
+
+const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const browser = await chromium.launch({
   executablePath: process.env.SUNSPOT_BROWSER_PATH || undefined,
 });
-const host = await browser.newContext({
+const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
+  reducedMotion: "reduce",
+  timezoneId: "Europe/Copenhagen",
 });
-const page = await host.newPage();
+await context.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
 const errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
-const base = process.env.SUNSPOT_URL || "http://localhost:3000";
-const ready = () =>
-  page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
-const slider = () => page.getByRole("slider", { name: "Dag och tid" });
+const expandFinder = async (target) => {
+  const toggle = target.locator(".finder-toggle");
+  await toggle.waitFor({ state: "visible" });
+  if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
+};
+
+const page = await context.newPage();
+page.on("pageerror", (error) => errors.push(error.message));
+const eventRequests = [];
+page.on("request", (request) => {
+  if (request.url().includes("/api/events")) eventRequests.push(request.url());
+});
+let weatherMode = "clear";
+function forecast(mode = weatherMode) {
+  if (mode === "missing") return { available: false };
+  return {
+    available: true,
+    stale: false,
+    updatedAt: "2026-10-27T11:00:00Z",
+    timeseries: Array.from({ length: 168 }, (_, hour) => ({
+      time: new Date(
+        Date.parse("2026-10-27T00:00:00Z") + hour * 3600_000,
+      ).toISOString(),
+      data: {
+        instant: {
+          details: {
+            air_temperature: 18,
+            wind_speed: 2,
+            cloud_area_fraction: mode === "cloud" ? 100 : 5,
+          },
+        },
+        next_1_hours: {
+          summary: {
+            symbol_code:
+              mode === "rain"
+                ? "rain"
+                : mode === "cloud"
+                  ? "cloudy"
+                  : "clearsky_day",
+          },
+          details: { precipitation_amount: mode === "rain" ? 2 : 0 },
+        },
+      },
+    })),
+  };
+}
+await context.route("**/api/weather", (route) =>
+  route.fulfill({ json: forecast() }),
+);
+const ready = async () => {
+  await page.locator('.map-workspace[data-solar-pending="false"]').waitFor();
+  await expect(page.locator(".finder-submit")).toBeEnabled();
+};
+const open = async () => {
+  await page.clock.setSystemTime(new Date("2026-10-27T11:00:00Z"));
+  await page.goto(base, { waitUntil: "domcontentloaded" });
+  await ready();
+};
+const find = () =>
+  page
+    .getByRole("button", { name: "Hitta min plats i solen", exact: true })
+    .click();
+const invitationTime = new Date(
+  Math.max(Date.now() + 86400_000, Date.parse("2026-10-28T12:30:00Z")),
+);
+const meetingInput = `${localDate(invitationTime)}T${clock(invitationTime)}`;
+const [meetingHour, meetingMinute] = clock(invitationTime)
+  .split(":")
+  .map(Number);
+const expectedStart = atHour(
+  localDate(invitationTime),
+  meetingHour + meetingMinute / 60,
+).toISOString();
 let gatheringId;
+let hostToken;
 try {
-  await page.route("**/api/events?**", (route) =>
-    route.fulfill({ json: { events: [], available: true, stale: false } }),
-  );
-  await page.addInitScript(() =>
-    localStorage.setItem("sunspot:demo-events", "true"),
-  );
-  await page.clock.setSystemTime(new Date("2026-09-21T12:00:00Z"));
-  await page.goto(base, { waitUntil: "domcontentloaded" });
-  await ready();
-  await expect(page.locator(".detail-card")).toHaveCount(0);
-  await expect(page.locator(".shadow-legend")).toHaveCount(0);
-  await expect(page.getByRole("slider")).toBeVisible();
-  await page.screenshot({ path: "artifacts/map-first-desktop.png" });
-  await page.getByRole("button", { name: "Om kartan", exact: true }).click();
-  await expect(page.locator(".shadow-legend")).toBeVisible();
-  await page.getByRole("button", { name: "Om kartan", exact: true }).click();
+  await mkdir("artifacts", { recursive: true });
+  await open();
+  await expandFinder(page);
+  await expect(
+    page.getByRole("combobox", { name: "Dag", exact: true }),
+  ).toHaveValue("2026-10-27");
+  await expect(
+    page
+      .getByRole("textbox", { name: "Exakt klockslag" })
+      .or(page.locator('input[type="time"]')),
+  ).toHaveValue("12:00");
+  await expect(page.locator(".place-pin")).toHaveCount(0);
+  for (const name of ["Park", "Bar", "Mat"])
+    await expect(
+      page.getByRole("button", { name, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Event", exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Öppna filter", exact: true }).click();
-  await page
-    .getByRole("checkbox", { name: "Bara bekräftat öppet enligt OSM" })
-    .check();
-  await page.getByRole("button", { name: "Visa kartan", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Sök plats eller område" })
-    .fill("ingenting");
-  await page.getByRole("button", { name: "Alla", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Visa platslista", exact: true })
-    .click();
-  await expect(page.locator(".place-list h3")).toHaveCount(places.length);
+  await expect(
+    page.getByRole("checkbox", { name: "Dölj skugga och osäkert solläge" }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("checkbox", { name: "Bara bekräftat öppet enligt OSM" }),
+  ).toBeChecked();
   await page.keyboard.press("Escape");
-  assert.ok(
-    (await page.locator(".place-pin:not(.event-pin)").count()) < places.length,
-    "city overview groups places",
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.screenshot({ path: "artifacts/finder-desktop.png" });
+
+  await page.getByRole("button", { name: "Bar", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Park", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Mat", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  for (const name of ["Park", "Mat"])
+    await page.getByRole("button", { name, exact: true }).click();
+  await find();
+  await expect(page.locator(".opening-theatre")).toHaveCount(0);
+  await assertCharacterScope(page);
+  await expect(page.locator('.finder-empty[data-experience="empty.no-types"] > p')).toHaveText(
+    "Välj park, bar eller mat för att se platser.",
   );
-  for (const [label, category] of [
-    ["Bar", "bar"],
-    ["Mat", "restaurant"],
-  ]) {
-    await page.getByRole("button", { name: label, exact: true }).click();
-    await expect(page.locator(".venue-focus-veil")).toHaveCount(1);
-    await page
-      .getByRole("button", { name: "Visa platslista", exact: true })
-      .click();
-    await expect(page.locator(".place-list h3")).toHaveCount(
-      places.filter((p) => p.category === category).length,
-    );
-    await page.keyboard.press("Escape");
-  }
-  await page.getByRole("button", { name: "Touchgrass", exact: true }).click();
-  await expect(page.locator(".park-focus-outline")).toHaveCount(
-    places.filter((p) => p.greenSpace).length,
-  );
+  await expect(page.locator(".finder-empty").getByRole("button", { name: "Välj område och typer", exact: true })).toBeVisible();
+  await expect(page.locator(".place-pin")).toHaveCount(0);
   await page
-    .getByRole("textbox", { name: "Sök plats eller område" })
-    .fill("faelledsparken");
+    .getByRole("button", { name: "Ändra sökning", exact: true })
+    .click();
+  await expandFinder(page);
+  await page.getByRole("button", { name: "Bar", exact: true }).click();
+  await page.locator("#district").selectOption("Nørrebro");
+  await find();
+  await expect(page.locator(".finder-summary")).toContainText("2 match");
+  await expect(page.locator(".detail-card")).toContainText("Café Stefanshus");
+  await page.getByRole("button", { name: "Visa Café Stefanshus", exact: true }).click();
+  await expect(page.locator(".map-workspace.opening-active")).toHaveCount(0);
+  await assertCharacterScope(page);
+  const sunFocus = page.locator(".sun-focus-color-pane");
+  await expect(sunFocus).toHaveCount(1);
+  await expect(sunFocus).toHaveCSS("pointer-events", "none");
+  await expect.poll(async () => Number(await sunFocus.getAttribute("data-active-count"))).toBeGreaterThan(0);
+  const direction = new URL(
+    await page.getByRole("link", { name: "Ta mig dit" }).getAttribute("href"),
+  );
+  assert.equal(direction.origin, "https://www.google.com");
+  assert.equal(direction.searchParams.get("travelmode"), "walking");
   await page
     .getByRole("button", { name: "Visa platslista", exact: true })
     .click();
-  await page
-    .locator(".place-list")
-    .getByRole("heading", { name: "Fælledparken", exact: true })
-    .click();
-  await expect(page.locator(".detail-card")).toContainText("Fælledparken");
-  await page.getByRole("button", { name: "Stäng plats", exact: true }).click();
-  await page.getByRole("button", { name: "Alla", exact: true }).click();
-  await page.getByRole("button", { name: "Event", exact: true }).click();
-  await page.locator(".days button").nth(0).click();
-  await slider().fill("895");
-  await expect(
-    page.getByRole("button", { name: "Visa Måndagshäng · demo", exact: true }),
-  ).toHaveCount(0);
-  await slider().fill("900");
-  await expect(
-    page.getByRole("button", { name: "Visa Måndagshäng · demo", exact: true }),
-  ).toHaveCount(1);
-  await page
-    .getByRole("button", { name: "Visa Måndagshäng · demo", exact: true })
-    .click();
-  await expect(page.getByRole("dialog", { name: "Valt event" })).toContainText(
-    "inget verkligt evenemang",
+  await expect(page.locator(".place-list h3")).toHaveCount(2);
+  await assertCharacterScope(page);
+  for (const card of await page.locator(".place-list .place-card").all())
+    await expect(card.locator(".place-copy > p")).toContainText(/^Bar\b/);
+  await page.keyboard.press("Escape");
+  await page.screenshot({ path: "artifacts/finder-results-desktop.png" });
+  weatherMode = "cloud";
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event("visibilitychange")),
   );
-  await page.screenshot({ path: "artifacts/event-desktop.png" });
-  await slider().fill("1020");
-  await expect(page.locator(".event-pin")).toHaveCount(0);
-  await expect(page.locator(".event-card")).toHaveCount(0);
-  await slider().fill("960");
-  await slider().fill(String(1440 + 960));
-  await expect(
-    page.getByRole("button", { name: "Visa Måndagshäng · demo", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Visa Livemusik · demo", exact: true }),
-  ).toHaveCount(1);
-  // Invitations use the real server clock; event fixtures above use a fixed Monday.
-  await page.clock.setSystemTime(new Date());
-  await page.goto(base, { waitUntil: "domcontentloaded" });
-  await ready();
-  await page.getByRole("button", { name: "Alla", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Sök plats eller område" })
-    .fill("Kayak");
-  await page
-    .getByRole("button", { name: "Visa platslista", exact: true })
-    .click();
-  await page
-    .locator(".place-list")
-    .getByRole("heading", { name: "Kayak Bar", exact: true })
-    .click();
+  await expect(page.locator('.finder-empty[data-experience="weather.cloud"] > p')).toHaveText("Prognosen visar moln. Prova en annan tid för att hitta sol.");
+  await expect(page.locator(".place-pin")).toHaveCount(0);
+  weatherMode = "clear";
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event("visibilitychange")),
+  );
+  await expect(page.locator(".finder-summary")).toContainText("2 match");
+
   await page
     .getByRole("button", { name: "Ses här med vänner", exact: true })
     .click();
-  await page
-    .getByRole("textbox", { name: "Ditt namn", exact: true })
-    .fill("Testvärd");
+  await page.locator("#meeting-time").fill(meetingInput);
+  await page.locator("#host").fill("Testvärd");
   await page
     .getByRole("button", { name: "Skapa inbjudan", exact: true })
     .click();
   await page.waitForURL("**/invite/**");
   gatheringId = page.url().split("/").at(-1);
+  hostToken = await page.evaluate(
+    (id) => JSON.parse(localStorage.getItem(`sunspot:host:${id}`)),
+    gatheringId,
+  );
+  const invitation = await (
+    await page.request.get(`${base}/api/gatherings/${gatheringId}`)
+  ).json();
+  assert.equal(invitation.starts_at || invitation.startsAt, expectedStart);
   const guestContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
   });
+  await guestContext.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
   const guest = await guestContext.newPage();
-  guest.on("pageerror", (e) => errors.push(e.message));
+  guest.on("pageerror", (error) => errors.push(error.message));
   await guest.goto(page.url(), { waitUntil: "domcontentloaded" });
   await guest
     .getByRole("textbox", { name: "Ditt namn", exact: true })
@@ -153,6 +217,7 @@ try {
   ).toBeVisible();
   await guest.reload({ waitUntil: "domcontentloaded" });
   await expect(guest.getByText("1 kommer", { exact: true })).toBeVisible();
+  await expect(guest.locator(".cast-character")).toHaveCount(0);
   await guest.getByRole("radio", { name: "Kanske", exact: true }).check();
   await guest
     .getByRole("button", { name: "Spara mitt svar", exact: true })
@@ -164,87 +229,180 @@ try {
     .click();
   await page.getByRole("button", { name: "Ja, ställ in", exact: true }).click();
   await expect(page.getByText("TRÄFFEN ÄR INSTÄLLD")).toBeVisible();
-  await page.clock.setSystemTime(new Date("2026-09-21T12:00:00Z"));
-  await page.goto(base, { waitUntil: "domcontentloaded" });
-  await ready();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator(".detail-card")).toHaveCount(0);
-  for (const height of [844, 667]) {
-    await page.setViewportSize({ width: 390, height });
-    const box = await slider().boundingBox();
+  await guestContext.close();
+
+  for (const [mode, moment, message, action] of [
+    ["cloud", "weather.cloud", "Prognosen visar moln. Prova en annan tid för att hitta sol.", "Välj en annan tid"],
+    ["rain", "weather.rain", "Prognosen visar nederbörd. Prova en annan tid.", "Välj en annan tid"],
+    ["missing", "weather.missing", "Det finns ingen väderprognos för den valda tiden. Försök hämta vädret igen.", "Hämta vädret igen"],
+  ]) {
+    weatherMode = mode;
+    await open();
+    await find();
+    await expect(page.locator(`.finder-empty[data-experience="${moment}"] > p`)).toHaveText(message);
+    await expect(page.locator(".finder-empty").getByRole("button", { name: action, exact: true })).toBeVisible();
+    await expect(page.locator(".place-pin")).toHaveCount(0);
+    await expect(page.locator(".detail-card")).toHaveCount(0);
+  }
+  weatherMode = "clear";
+  await open();
+  await page.setViewportSize({ width: 390, height: 667 });
+  await expect(page.locator(".finder-submit")).toBeInViewport();
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  await page.screenshot({ path: "artifacts/finder-mobile.png" });
+  await find();
+  await expect(page.locator(".finder-summary")).toContainText("match");
+  for (const action of [
+    page.getByRole("link", { name: "Ta mig dit", exact: true }),
+    page.getByRole("button", { name: "Ses här med vänner", exact: true }),
+  ]) {
+    await expect(action).toBeInViewport({ ratio: 1 });
     assert.ok(
-      box.y + box.height < height && box.y > height / 2,
-      "slider stays at bottom of viewport",
-    );
-    assert.ok(
-      await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth <= innerWidth &&
-          document.documentElement.scrollHeight <= innerHeight,
-      ),
+      await action.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2,
+        ));
+      }),
+      "mobile result actions remain unobstructed without scrolling",
     );
   }
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: "artifacts/map-first-mobile.png" });
-  await page.getByRole("button", { name: "Event", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Visa platslista", exact: true })
-    .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: /Livemusik · demo/ })
-    .click();
-  await expect(page.locator(".event-card")).toBeVisible();
-  const eventBox = await page.locator(".event-card").boundingBox(),
-    dockBox = await page.locator(".time-dock").boundingBox();
+  const mapShare = await page.evaluate(() => {
+    const map = document.querySelector(".leaflet-container");
+    let exposed = 0;
+    let sampled = 0;
+    for (let y = 20; y < innerHeight - 20; y += 40) {
+      for (let x = 20; x < innerWidth - 20; x += 40) {
+        const hit = document.elementFromPoint(x, y);
+        sampled += 1;
+        if (map && hit && (hit === map || map.contains(hit))) exposed += 1;
+      }
+    }
+    return sampled ? exposed / sampled : 0;
+  });
   assert.ok(
-    eventBox.y + eventBox.height <= dockBox.y,
-    "event detail does not cover time slider",
+    mapShare >= 0.25,
+    `mobile results leave at least 25% clickable map (${Math.round(mapShare * 100)}% exposed)`,
   );
-  await page.screenshot({ path: "artifacts/event-mobile.png" });
-  await slider().fill(String(1440 + 1140));
-  await expect(page.locator(".event-card")).toHaveCount(0);
-  await page.getByRole("button", { name: "Öppna filter", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.route("**/data/copenhagen-buildings.json", (r) =>
-    r.fulfill({ status: 503, body: "Unavailable" }),
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  await page.screenshot({ path: "artifacts/finder-results-mobile.png" });
+
+  const geoContext = await browser.newContext({
+    geolocation: { latitude: 55.69, longitude: 12.55 },
+    permissions: ["geolocation"],
+    viewport: { width: 390, height: 844 },
+  });
+  await geoContext.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
+  await geoContext.route("**/api/weather", (route) =>
+    route.fulfill({ json: forecast("clear") }),
+  );
+  const nearby = await geoContext.newPage();
+  nearby.on("pageerror", (error) => errors.push(error.message));
+  await nearby.clock.setSystemTime(new Date("2026-10-27T11:00:00Z"));
+  await nearby.goto(base, { waitUntil: "domcontentloaded" });
+  await expandFinder(nearby);
+  await nearby.getByRole("button", { name: "Nära mig", exact: true }).click();
+  await expect(
+    nearby.getByRole("button", { name: "Inom 1,5 km från dig" }),
+  ).toBeVisible();
+  await geoContext.close();
+  for (const [position, permissions, moment, message] of [
+    [{ latitude: 56, longitude: 10 }, ["geolocation"], "empty.outside", "SunSpot täcker centrala Köpenhamn just nu. Välj ett område i Köpenhamn i stället."],
+    [{ latitude: 55.69, longitude: 12.55 }, [], "empty.location", "Välj ett område manuellt eller tillåt åtkomst till din plats."],
+  ]) {
+    const scenario = await browser.newContext({
+      geolocation: position,
+      permissions,
+    });
+    await scenario.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
+    await scenario.route("**/api/weather", (route) =>
+      route.fulfill({ json: forecast("clear") }),
+    );
+    const locationPage = await scenario.newPage();
+    locationPage.on("pageerror", (error) => errors.push(error.message));
+    await locationPage.clock.setSystemTime(new Date("2026-10-27T11:00:00Z"));
+    await locationPage.goto(base, { waitUntil: "domcontentloaded" });
+    await expandFinder(locationPage);
+    await locationPage
+      .getByRole("button", { name: "Nära mig", exact: true })
+      .click();
+    await expect(locationPage.locator(`.finder-notice[data-reason="${moment}"]`)).toHaveText(message, {
+      timeout: 15000,
+    });
+    await scenario.close();
+  }
+
+  const delayedContext = await browser.newContext();
+  await delayedContext.addCookies([{ name: "sunspot-language", value: "sv", url: base }]);
+  await delayedContext.route("**/api/weather", (route) =>
+    route.fulfill({ json: forecast("clear") }),
+  );
+  await delayedContext.addInitScript(() => {
+    navigator.geolocation.getCurrentPosition = (success) => {
+      window.releaseLocation = () =>
+        success({ coords: { longitude: 12.55, latitude: 55.69 } });
+    };
+  });
+  const delayed = await delayedContext.newPage();
+  await delayed.goto(base, { waitUntil: "domcontentloaded" });
+  await expandFinder(delayed);
+  await delayed.getByRole("button", { name: "Nära mig", exact: true }).click();
+  await expect(delayed.locator("#district")).toBeDisabled();
+  await delayed.evaluate(() => window.releaseLocation());
+  await expect(delayed.locator("#district")).toBeEnabled();
+  await delayedContext.close();
+
+  await open();
+  await page.route("**/data/copenhagen-buildings.json", (route) =>
+    route.fulfill({ status: 503, body: "Unavailable" }),
   );
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(
     page.getByText("Skuggdata kunde inte laddas.", { exact: true }),
   ).toBeVisible();
-  // The active demo is outside the initial mobile viewport; discovery still
-  // works without shadow data and selecting it brings its marker into view.
-  await page.getByRole("button", { name: "Visa veckans event" }).click();
-  await page
-    .getByRole("dialog", { name: "Event denna vecka" })
-    .getByRole("button", { name: /Livemusik · demo/ })
-    .click();
-  await expect(page.locator(".event-pin")).toHaveCount(1);
-  await page.getByRole("button", { name: "Stäng event" }).click();
   await page.unroute("**/data/copenhagen-buildings.json");
-  await page.getByRole("button", { name: "Försök igen", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Ladda skuggdata igen", exact: true })
+    .click();
   await ready();
+  await assertCharacterScope(page);
+  assert.deepEqual(eventRequests, []);
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
       passed: true,
       checks: [
-        "map-first desktop and mobile",
-        "compact controls and dismissible details",
-        "category focus and filter reset",
-        "event start/end and Monday/Tuesday boundaries",
-        "event detail removed at expiry",
-        "event independent of shadow loading",
-        "invitation and independent guest RSVP",
+        "today/now and safe defaults",
+        "independent category toggles",
+        "empty search",
+        "district selection and focused results",
+        "directions",
+        "future invitation and guest RSVP/update",
         "host cancellation",
-        "small viewport and no overflow",
-        "modal keyboard and data retry",
+        "cloud/rain/missing forecast",
+        "mobile result actions and at least 25% clickable map without scrolling",
+        "nearby/coverage/permission denial",
+        "no external event requests",
+        "building data retry",
       ],
-      gatheringId,
     }),
   );
 } finally {
+  if (gatheringId && hostToken)
+    await context.request
+      .patch(`${base}/api/gatherings/${gatheringId}`, {
+        headers: { "x-host-token": hostToken },
+        data: { cancelled: true },
+      })
+      .catch(() => {});
   await browser.close();
 }

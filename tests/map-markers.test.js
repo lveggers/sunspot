@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groupMapMarkers } from "../src/mapMarkers.js";
+import { groupMapMarkers, sunFocusPoints } from "../src/mapMarkers.js";
 import { projectPoint } from "../src/shadowRenderer.js";
 const items = Array.from({ length: 120 }, (_, i) => ({
   id: `park-${i}`,
@@ -24,17 +24,15 @@ test("city-scale groups retain every park and release individual places on zoom"
   assert.deepEqual(unpack(grouped), items.map((p) => p.id).sort());
   assert.equal(groupMapMarkers(items, { ...options, zoom: 17 }).length, 120);
 });
-test("selected places and individual events remain accessible; offscreen places are culled", () => {
-  const event = { ...items[0], id: "event", category: "event" };
+test("selected places remain accessible; offscreen places are culled", () => {
   const outside = { ...items[0], id: "outside", lat: 56 };
-  const result = groupMapMarkers([...items, event, outside], {
+  const result = groupMapMarkers([...items, outside], {
     ...options,
     selectedId: "park-0",
   });
   assert.ok(result.some((m) => m.markerId === "park-0" && !m.members));
-  assert.ok(result.some((m) => m.markerId === "event" && !m.members));
   assert.ok(!unpack(result).includes("outside"));
-  assert.equal(new Set(unpack(result)).size, 121);
+  assert.equal(new Set(unpack(result)).size, 120);
 });
 test("group identities are stable when input order changes", () => {
   assert.deepEqual(
@@ -53,4 +51,21 @@ test("worker projection preserves Mercator origin, scale and Copenhagen location
   assert.equal(b.x, 2 * a.x);
   assert.equal(b.y, 2 * a.y);
   assert.ok(Number.isFinite(projectPoint(90, 0, 18).y));
+});
+
+test("map colour requires fresh sunny weather, daylight, an eligible sunny place and confirmed opening", () => {
+  const place = { id: "focus", lat: 55.68, lng: 12.57 };
+  const result = { state: "sun", eligible: true, point: [12.58, 55.69], opening: { state: "open" } };
+  const input = { pending: false, weatherState: "sun", daylight: true };
+  const focused = (changes = {}, options = {}) => sunFocusPoints([place], { focus: { ...result, ...changes } }, { ...input, ...options });
+  assert.deepEqual(focused(), [{ id: "focus", lat: 55.69, lng: 12.58 }]);
+  for (const weatherState of ["cloud", "rain", "unknown", "loading", "stale", undefined]) assert.deepEqual(focused({}, { weatherState }), []);
+  assert.deepEqual(focused({}, { pending: true }), []);
+  assert.deepEqual(focused({}, { daylight: false }), []);
+  for (const state of ["shade", "unknown", "weather-unknown", "cloud", "rain"]) assert.deepEqual(focused({ state }), []);
+  for (const state of ["closed", "unknown", undefined]) assert.deepEqual(focused({ opening: { state } }), []);
+  assert.deepEqual(focused({ eligible: false }), []);
+  assert.deepEqual(focused({ point: [NaN, 55.69] }), []);
+  assert.deepEqual(sunFocusPoints([], { focus: result }, input), []);
+  assert.deepEqual(sunFocusPoints([place], {}, input), []);
 });
