@@ -49,3 +49,4 @@ coverage/
 # Local application state and screenshots
 .data/
 artifacts/
+.env*.local

@@ -16,29 +16,37 @@
     "data:venues": "node scripts/build-venue-data.mjs",
     "test:events": "node scripts/verify-events.mjs",
     "data:event-locations": "node scripts/import-event-locations.mjs",
-    "test:map": "node scripts/verify-map-performance.mjs"
+    "test:map": "node scripts/verify-map-performance.mjs",
+    "test:nearby": "node scripts/verify-nearby.mjs",
+    "test:i18n": "node scripts/verify-i18n.mjs",
+    "test:share": "node scripts/verify-hangs.mjs",
+    "test:hangs": "node scripts/verify-hangs.mjs",
+    "test:profile": "node scripts/verify-profile.mjs",
+    "test:account": "node scripts/verify-account.mjs"
   },
   "dependencies": {
-    "leaflet": "^1.9.4",
-    "next": "16.3.5",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "suncalc": "^2.0.2",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
-    "lucide-react": "^1.46.0"
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.46.0",
+    "next": "16.3.5",
+    "next-auth": "^5.0.0-beta.32",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "sharp": "^0.35.4",
+    "suncalc": "^2.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "agent-browser": "^0.38.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
-    "typescript": "^5",
-    "@playwright/test": "^1.63.0",
-    "agent-browser": "^0.38.0",
-    "osmtogeojson": "^3.0.0-beta.5"
+    "osmtogeojson": "^3.0.0-beta.5",
+    "typescript": "^5"
   },
   "type": "module",
   "engines": {

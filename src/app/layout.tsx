@@ -1,11 +1,12 @@
+import { AccountProvider } from "../Account.jsx";
 import type { Metadata } from "next";
 import "leaflet/dist/leaflet.css";
 import "../styles.css";
 
 export const metadata: Metadata = {
-  title: "SunSpot — Sun guides your decision",
+  title: "SunSpot — Good company. One link away.",
   description:
-    "Hitta soliga parker, barer och restauranger i Köpenhamn och planera en träff med vänner.",
+    "Hitta en plats i Köpenhamn, dela ett häng och låt vänner komma förbi. Med eller utan sol.",
   icons: { icon: "/favicon.svg" },
 };
 
@@ -16,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="sv">
-      <body>{children}</body>
+      <body>
+        <AccountProvider>{children}</AccountProvider>
+      </body>
     </html>
   );
 }

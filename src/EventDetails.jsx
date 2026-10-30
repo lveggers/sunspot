@@ -1,3 +1,4 @@
+import { useLanguage } from "./Language.jsx";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import L from "leaflet";
@@ -13,8 +14,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { clock, dateLabel, localDate, weatherAt, weatherText } from "./lib.js";
-
 function EventMap({ event }) {
+  const { t } = useLanguage();
   const ref = useRef(null);
   useEffect(() => {
     const map = L.map(ref.current, {
@@ -49,12 +50,12 @@ function EventMap({ event }) {
       className="event-mini-map"
       ref={ref}
       role="img"
-      aria-label={`Karta: ${event.venue || event.name}`}
+      aria-label={t("Karta: {0}", [event.venue || event.name])}
     />
   );
 }
-
 export default function EventDetails({ event, weather, onClose, stale }) {
+  const { t, locale } = useLanguage();
   const ref = useRef(null),
     closeRef = useRef(null);
   const [shareStatus, setShareStatus] = useState("");
@@ -64,7 +65,9 @@ export default function EventDetails({ event, weather, onClose, stale }) {
     localDate(new Date(event.startsAt)) !== localDate(new Date(event.endsAt));
   useEffect(() => {
     const previous = document.activeElement;
-    closeRef.current?.focus({ preventScroll: true });
+    closeRef.current?.focus({
+      preventScroll: true,
+    });
     const escape = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -76,13 +79,19 @@ export default function EventDetails({ event, weather, onClose, stale }) {
     return () => {
       document.removeEventListener("keydown", escape);
       if (panel?.contains(document.activeElement) && previous?.isConnected)
-        previous.focus({ preventScroll: true });
+        previous.focus({
+          preventScroll: true,
+        });
     };
   }, [onClose]);
   async function share() {
     const url = event.sourceUrl;
     try {
-      if (navigator.share) await navigator.share({ title: event.name, url });
+      if (navigator.share)
+        await navigator.share({
+          title: event.name,
+          url,
+        });
       else {
         await navigator.clipboard.writeText(url);
         setShareStatus("Eventlänken är kopierad.");
@@ -99,22 +108,22 @@ export default function EventDetails({ event, weather, onClose, stale }) {
       className="event-card event-sheet"
       role="dialog"
       aria-modal="false"
-      aria-label="Valt event"
+      aria-label={t("Valt event")}
     >
       <div className="event-sheet-toolbar">
         <button
           ref={closeRef}
           className="event-round-button"
-          aria-label="Stäng event"
+          aria-label={t("Stäng event")}
           onClick={onClose}
         >
           <ArrowLeft size={21} />
         </button>
-        <span>{event.demo ? "DEMO-EVENT" : "UPPTÄCK KÖPENHAMN"}</span>
+        <span>{event.demo ? "DEMO-EVENT" : t("UPPTÄCK KÖPENHAMN")}</span>
         {event.sourceUrl && (
           <button
             className="event-round-button"
-            aria-label="Dela event"
+            aria-label={t("Dela event")}
             onClick={share}
           >
             <Share2 size={19} />
@@ -128,7 +137,7 @@ export default function EventDetails({ event, weather, onClose, stale }) {
           {event.imageUrl && !imageFailed ? (
             <Image
               src={event.imageUrl}
-              alt={`Omslag: ${event.name}`}
+              alt={t("Omslag: {0}", [event.name])}
               width={900}
               height={650}
               unoptimized
@@ -137,30 +146,36 @@ export default function EventDetails({ event, weather, onClose, stale }) {
           ) : (
             <>
               <Sun size={84} strokeWidth={1} />
-              <span>{event.tags?.[0] || "En stund tillsammans"}</span>
+              <span>{event.tags?.[0] || t("En stund tillsammans")}</span>
             </>
           )}
           <span className="event-cover-label">
-            {event.demo ? "Fiktivt exempel" : event.tags?.[0] || "I Köpenhamn"}
+            {event.demo
+              ? t("Fiktivt exempel")
+              : event.tags?.[0] || t("I Köpenhamn")}
           </span>
         </div>
         <div className="event-title-block">
           <h2>{event.name.replace(/ · demo$/, "")}</h2>
           <p className="event-presenter">
-            Av <strong>{event.organizer || "SunSpot · demo"}</strong>
+            {t("Av ")}
+            <strong>{event.organizer || "SunSpot · demo"}</strong>
           </p>
           <div className="event-fact">
             <CalendarDays size={19} />
             <div>
               <strong>
-                {dateLabel(event.startsAt)}
-                {multiDay ? ` – ${dateLabel(event.endsAt)}` : ""}
+                {dateLabel(event.startsAt, locale)}
+                {multiDay ? ` – ${dateLabel(event.endsAt, locale)}` : ""}
               </strong>
               <span>
                 <Clock3 size={13} />{" "}
                 {event.allDay
-                  ? "Heldag enligt källan"
-                  : `${clock(event.startsAt)}–${clock(event.endsAt)} · Köpenhamnstid`}
+                  ? t("Heldag enligt källan")
+                  : t("{0}–{1} · Köpenhamnstid", [
+                      clock(event.startsAt),
+                      clock(event.endsAt),
+                    ])}
               </span>
             </div>
           </div>
@@ -174,40 +189,45 @@ export default function EventDetails({ event, weather, onClose, stale }) {
               rel="noopener noreferrer"
             >
               <Ticket size={19} />
-              {event.soldOut ? "Se arrangörens sida" : "Se event & anmälan"}
+              {event.soldOut
+                ? t("Se arrangörens sida")
+                : t("Se event & anmälan")}
               <ArrowUpRight size={18} />
             </a>
           ) : (
             <p className="event-demo-notice">
-              Demo-event · inget verkligt evenemang och ingen anmälan.
+              {t("Demo-event · inget verkligt evenemang och ingen anmälan.")}
             </p>
           )}
           {!event.demo && (
             <span className="event-price">
               {event.soldOut
-                ? "Slutsålt enligt källan"
+                ? t("Slutsålt enligt källan")
                 : event.registrationNotOpen
-                  ? "Anmälan har inte öppnat"
-                  : event.priceLabel || "Se pris hos arrangören"}
+                  ? t("Anmälan har inte öppnat")
+                  : t(event.priceLabel) || t("Se pris hos arrangören")}
             </span>
           )}
           <span role="status" className="event-share-status">
-            {shareStatus}
+            {t(shareStatus)}
           </span>
         </div>
         <section className="event-section">
           <div className="event-section-heading">
-            <h3>Plats</h3>
+            <h3>{t("Plats")}</h3>
             {forecast && (
               <span
                 className="event-forecast"
-                title={weatherText(forecast.symbol)}
+                title={t(weatherText(forecast.symbol))}
               >
-                {Math.round(forecast.temperature)}° · vid start
+                {Math.round(forecast.temperature)}
+                {t("° · vid start")}
               </span>
             )}
           </div>
-          <strong className="event-venue">{event.venue || "Köpenhamn"}</strong>
+          <strong className="event-venue">
+            {event.venue || t("Köpenhamn")}
+          </strong>
           {event.address && <p>{event.address}</p>}
           <EventMap event={event} />
           <a
@@ -216,15 +236,24 @@ export default function EventDetails({ event, weather, onClose, stale }) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <MapPin size={16} /> Hitta hit <ArrowUpRight size={16} />
+            <MapPin size={16} />
+            {t(" Hitta hit ")}
+            <ArrowUpRight size={16} />
           </a>
         </section>
         <section className="event-section">
-          <h3>Om eventet</h3>
+          <h3>{t("Om eventet")}</h3>
           <p className="event-description">{event.description}</p>
+          {locale !== "sv" && (
+            <p className="fineprint">
+              {t("Arrangörens beskrivning visas på originalspråket.")}
+            </p>
+          )}
           {multiDay && (
             <p className="event-schedule-note">
-              Flerdagarsevent — kontrollera dagens öppettider hos arrangören.
+              {t(
+                "Flerdagarsevent — kontrollera dagens öppettider hos arrangören.",
+              )}
             </p>
           )}
           {event.scheduleNote && (
@@ -232,7 +261,7 @@ export default function EventDetails({ event, weather, onClose, stale }) {
           )}
           {!!event.agenda?.length && (
             <>
-              <h3>Program</h3>
+              <h3>{t("Program")}</h3>
               <ol className="event-agenda">
                 {event.agenda.map((item) => (
                   <li key={`${item.time}-${item.title}`}>
@@ -267,7 +296,7 @@ export default function EventDetails({ event, weather, onClose, stale }) {
               </span>
             )}
             <div>
-              <small>Arrangör</small>
+              <small>{t("Arrangör")}</small>
               <strong>{event.organizer}</strong>
             </div>
             {event.organizerUrl && (
@@ -275,7 +304,7 @@ export default function EventDetails({ event, weather, onClose, stale }) {
                 href={event.organizerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Besök arrangören"
+                aria-label={t("Besök arrangören")}
               >
                 <ArrowUpRight size={20} />
               </a>
@@ -285,13 +314,16 @@ export default function EventDetails({ event, weather, onClose, stale }) {
         {event.sourceUrl && (
           <footer className="event-source">
             <a href={event.sourceUrl} target="_blank" rel="noopener noreferrer">
-              Källa: {event.source} <ExternalLink size={12} />
+              {t("Källa: ")}
+              {event.source} <ExternalLink size={12} />
             </a>
             <p>
-              {event.curated ? "Manuellt kontrollerat" : "Hämtat"}{" "}
-              {event.checkedAt ? dateLabel(event.checkedAt) : "från arrangören"}
-              . {stale && !event.curated ? "Äldre uppgifter visas. " : ""}
-              Kontrollera tider och tillgänglighet hos arrangören.
+              {event.curated ? t("Manuellt kontrollerat") : t("Hämtat")}{" "}
+              {event.checkedAt
+                ? dateLabel(event.checkedAt, locale)
+                : t("från arrangören")}
+              . {stale && !event.curated ? t("Äldre uppgifter visas. ") : ""}
+              {t("Kontrollera tider och tillgänglighet hos arrangören.")}
             </p>
           </footer>
         )}

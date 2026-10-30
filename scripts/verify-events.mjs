@@ -10,6 +10,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 const base = process.env.SUNSPOT_URL || "http://localhost:3000";
 const event = curatedEvents[0];
 try {
+  await page.addInitScript(() => localStorage.setItem("sunspot:language", "sv"));
   await page.clock.setSystemTime(new Date("2026-09-16T12:00:00Z"));
   await page.route("**/api/events?**", (route) =>
     route.fulfill({ json: { events: [event], available: true, stale: false } }),
@@ -17,8 +18,8 @@ try {
   await page.goto(base, { waitUntil: "domcontentloaded" });
   await expect(
     page.getByRole("button", { name: "Visa veckans event" }),
-  ).toContainText("1 event nu");
-  await expect(page.locator(".event-pin")).toHaveCount(1);
+  ).toContainText("0 event nu");
+  await expect(page.locator(".event-pin")).toHaveCount(0);
   await page.getByRole("button", { name: "Visa veckans event" }).click();
   await page
     .getByRole("dialog", { name: "Event denna vecka" })
@@ -63,8 +64,8 @@ try {
     .click();
   await expect(card).toBeVisible();
   await page
-    .getByRole("slider", { name: "Dag och tid" })
-    .fill(String(1440 + 18 * 60));
+    .getByRole("slider", { name: "Tid på dagen" })
+    .fill(String(18 * 60));
   await expect(card).toHaveCount(0);
   await expect(page.locator(".event-pin")).toHaveCount(0);
   // Weekly discovery includes upcoming events even when no marker is active.
@@ -76,9 +77,8 @@ try {
   await expect(page.getByLabel("Exakt klockslag")).toHaveValue("14:00");
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: "artifacts/event-sheet-desktop.png" });
-  await page
-    .getByRole("slider", { name: "Dag och tid" })
-    .fill(String(2 * 1440 + 14 * 60));
+  await page.locator(".days button").nth(2).click();
+  await page.getByRole("slider").fill(String(14 * 60));
   await expect(page.locator(".event-pin")).toHaveCount(0);
   await page.unroute("**/api/events?**");
   await page.route("**/api/events?**", (route) =>

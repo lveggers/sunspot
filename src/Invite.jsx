@@ -1,3 +1,4 @@
+import { useLanguage } from "./Language.jsx";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -13,8 +14,8 @@ import {
 } from "lucide-react";
 import { api, clock, dateLabel, durationLabel, saved, save } from "./lib.js";
 import { activityNames } from "./places.js";
-
 export default function Invite({ id }) {
+  const { t, locale } = useLanguage();
   const [g, setG] = useState(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -30,7 +31,11 @@ export default function Invite({ id }) {
     (signal) =>
       api(`/gatherings/${id}`, {
         signal,
-        headers: hostToken ? { "x-host-token": hostToken } : {},
+        headers: hostToken
+          ? {
+              "x-host-token": hostToken,
+            }
+          : {},
       })
         .then((data) => {
           if (signal?.aborted) return;
@@ -60,9 +65,17 @@ export default function Invite({ id }) {
           editToken: saved(`rsvp:${id}`)?.editToken,
         }),
       });
-      if (!save(`rsvp:${id}`, { name, answer, editToken: result.editToken }))
+      if (
+        !save(`rsvp:${id}`, {
+          name,
+          answer,
+          editToken: result.editToken,
+        })
+      )
         throw new Error(
-          "Svaret sparades, men webbläsaren kan inte spara behörigheten att ändra det.",
+          t(
+            "Svaret sparades, men webbläsaren kan inte spara behörigheten att ändra det.",
+          ),
         );
       await load();
       setSent(true);
@@ -77,8 +90,12 @@ export default function Invite({ id }) {
     try {
       await api(`/gatherings/${id}`, {
         method: "PATCH",
-        headers: { "x-host-token": hostToken },
-        body: JSON.stringify({ cancelled: true }),
+        headers: {
+          "x-host-token": hostToken,
+        },
+        body: JSON.stringify({
+          cancelled: true,
+        }),
       });
       await load();
     } catch (e) {
@@ -99,7 +116,8 @@ export default function Invite({ id }) {
   return (
     <main className="invite-page">
       <Link className="back-link" href="/">
-        <ArrowLeft size={17} /> Tillbaka till kartan
+        <ArrowLeft size={17} />
+        {t(" Tillbaka till kartan")}
       </Link>
       <div className="invite-card">
         <div className="invite-sun">
@@ -107,52 +125,64 @@ export default function Invite({ id }) {
         </div>
         {!g ? (
           <>
-            <h1>{error ? "Inbjudan saknas" : "Hämtar din inbjudan…"}</h1>
-            <p role="alert">{error}</p>
+            <h1>{error ? t("Inbjudan saknas") : t("Hämtar din inbjudan…")}</h1>
+            <p role="alert">{t(error)}</p>
           </>
         ) : (
           <>
             <span className="eyebrow">
-              {g.cancelled ? "TRÄFFEN ÄR INSTÄLLD" : "EN STUND TILLSAMMANS"}
+              {g.cancelled
+                ? t("TRÄFFEN ÄR INSTÄLLD")
+                : t("EN STUND TILLSAMMANS")}
             </span>
-            <h1>{activityNames[g.activity]}.</h1>
+            <h1>{t(activityNames[g.activity])}.</h1>
             <p className="invite-intro">
-              {g.host} bjuder in dig till <strong>{g.place.name}</strong>.
+              {g.host}
+              {t(" bjuder in dig till ")}
+              <strong>{g.place.name}</strong>.
             </p>
             <div className="invite-facts">
               <p>
                 <CalendarDays size={19} />
-                {dateLabel(g.startsAt)}
+                {dateLabel(g.startsAt, locale)}
               </p>
               <p>
                 <Clock3 size={19} />
                 {clock(new Date(g.startsAt))}–
                 {clock(new Date(Date.parse(g.startsAt) + g.duration * 60_000))}{" "}
-                · {durationLabel(g.duration)} · Köpenhamnstid
+                · {durationLabel(g.duration)}
+                {t(" · Köpenhamnstid")}
               </p>
               <p>
                 <MapPin size={19} />
-                {g.place.meeting}
+                {t(g.place.meeting)}
               </p>
             </div>
             {g.message && <blockquote>{g.message}</blockquote>}
             <div className="rsvp-counts">
               <span>
                 <Check size={16} />
-                {g.counts.yes} kommer
+                {g.counts.yes}
+                {t(" kommer")}
               </span>
-              <span>{g.counts.maybe} kanske</span>
-              <span>{g.counts.no} kan inte</span>
+              <span>
+                {g.counts.maybe}
+                {t(" kanske")}
+              </span>
+              <span>
+                {g.counts.no}
+                {t(" kan inte")}
+              </span>
             </div>
             {!g.cancelled && (
               <form onSubmit={respond} className="rsvp-form">
-                <label htmlFor="guest-name">Ditt namn</label>
+                <label htmlFor="guest-name">{t("Ditt namn")}</label>
                 <input
                   id="guest-name"
                   autoComplete="given-name"
                   required
                   maxLength={50}
-                  placeholder="Vad heter du?"
+                  placeholder={t("Vad heter du?")}
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -160,12 +190,12 @@ export default function Invite({ id }) {
                   }}
                 />
                 <fieldset>
-                  <legend>Kan du komma?</legend>
+                  <legend>{t("Kan du komma?")}</legend>
                   <div className="answer-options">
                     {[
-                      ["yes", "Jag kommer"],
-                      ["maybe", "Kanske"],
-                      ["no", "Kan inte"],
+                      ["yes", t("Jag kommer")],
+                      ["maybe", t("Kanske")],
+                      ["no", t("Kan inte")],
                     ].map(([value, label]) => (
                       <label
                         className={answer === value ? "chosen" : ""}
@@ -181,29 +211,35 @@ export default function Invite({ id }) {
                             setSent(false);
                           }}
                         />
-                        {label}
+                        {t(label)}
                       </label>
                     ))}
                   </div>
                 </fieldset>
                 <button className="primary wide" disabled={busy}>
-                  {busy ? "Sparar…" : sent ? "Svar sparat" : "Spara mitt svar"}
+                  {busy
+                    ? t("Sparar…")
+                    : sent
+                      ? t("Svar sparat")
+                      : t("Spara mitt svar")}
                   {sent ? <Check size={18} /> : <Users size={18} />}
                 </button>
               </form>
             )}
             {sent && (
               <p className="success" role="status">
-                Ditt svar är sparat. Du kan ändra det i den här webbläsaren.
+                {t(
+                  "Ditt svar är sparat. Du kan ändra det i den här webbläsaren.",
+                )}
               </p>
             )}
             {error && (
               <p className="error" role="alert">
-                {error}
+                {t(error)}
               </p>
             )}
             <div className="share-section">
-              <label htmlFor="invite-url">Inbjudningslänk</label>
+              <label htmlFor="invite-url">{t("Inbjudningslänk")}</label>
               <div className="copy-row">
                 <input
                   id="invite-url"
@@ -211,18 +247,22 @@ export default function Invite({ id }) {
                   value={window.location.href}
                   onFocus={(e) => e.target.select()}
                 />
-                <button onClick={copy} aria-label="Kopiera inbjudningslänk">
+                <button
+                  onClick={copy}
+                  aria-label={t("Kopiera inbjudningslänk")}
+                >
                   {copied ? <Check size={18} /> : <Copy size={18} />}
                 </button>
               </div>
               <p className="fineprint">
-                Lokal förhandsvisning: länken fungerar på den här datorn. Extern
-                delning kräver att SunSpot publiceras.
+                {t(
+                  "Lokal förhandsvisning: länken fungerar på den här datorn. Extern delning kräver att SunSpot publiceras.",
+                )}
               </p>
             </div>
             {g.isHost && (
               <section className="host-section">
-                <h2>Du är värd</h2>
+                <h2>{t("Du är värd")}</h2>
                 {g.answers.length ? (
                   <ul>
                     {g.answers.map((r, i) => (
@@ -230,9 +270,11 @@ export default function Invite({ id }) {
                         <span>{r.name}</span>
                         <b>
                           {
-                            { yes: "Kommer", maybe: "Kanske", no: "Kan inte" }[
-                              r.answer
-                            ]
+                            {
+                              yes: t("Kommer"),
+                              maybe: t("Kanske"),
+                              no: t("Kan inte"),
+                            }[r.answer]
                           }
                         </b>
                       </li>
@@ -240,23 +282,24 @@ export default function Invite({ id }) {
                   </ul>
                 ) : (
                   <p>
-                    Inga svar ännu. Öppna länken i ett annat webbläsarfönster
-                    för att prova.
+                    {t(
+                      "Inga svar ännu. Öppna länken i ett annat webbläsarfönster för att prova.",
+                    )}
                   </p>
                 )}
                 {!g.cancelled &&
                   (confirmCancel ? (
                     <div className="cancel-confirm">
-                      <p>Ställa in träffen för alla?</p>
+                      <p>{t("Ställa in träffen för alla?")}</p>
                       <button
                         className="danger"
                         disabled={busy}
                         onClick={cancel}
                       >
-                        Ja, ställ in
+                        {t("Ja, ställ in")}
                       </button>
                       <button onClick={() => setConfirmCancel(false)}>
-                        Behåll träffen
+                        {t("Behåll träffen")}
                       </button>
                     </div>
                   ) : (
@@ -264,14 +307,16 @@ export default function Invite({ id }) {
                       className="text-button"
                       onClick={() => setConfirmCancel(true)}
                     >
-                      <X size={15} /> Ställ in träffen
+                      <X size={15} />
+                      {t(" Ställ in träffen")}
                     </button>
                   ))}
               </section>
             )}
             <p className="fineprint">
-              Platsens solfönster är exempeldata. Träffen är ingen
-              bordsreservation.
+              {t(
+                "Solinformationen är en uppskattning. Träffen är ingen bordsreservation.",
+              )}
             </p>
           </>
         )}

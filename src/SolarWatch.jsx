@@ -1,3 +1,4 @@
+import { useLanguage } from "./Language.jsx";
 import { useEffect, useRef, useState } from "react";
 import { Bell, X, Footprints, Sun } from "lucide-react";
 import { places } from "./places.js";
@@ -25,6 +26,7 @@ export default function SolarWatch({
   onSelect,
   onLive,
 }) {
+  const { t } = useLanguage();
   const [permission, setPermission] = useState(
     typeof Notification !== "undefined"
       ? Notification.permission
@@ -51,8 +53,11 @@ export default function SolarWatch({
     const key = `${id}:${result.point.join(",")}:${new Date(shadowAt).toISOString().slice(0, 16)}`;
     if (sent.current.has(key)) return;
     try {
-      new Notification(`Skugga närmar sig ${place.name}`, {
-        body: `Beräknad skugga om cirka ${result.until} minuter. Öppna SunSpot för soliga alternativ.`,
+      new Notification(t("Skugga närmar sig {0}", [place.name]), {
+        body: t(
+          "Beräknad skugga om cirka {0} minuter. Öppna SunSpot för soliga alternativ.",
+          [result.until],
+        ),
         tag: `sunspot-${id}`,
       });
       sent.current.add(key);
@@ -61,7 +66,7 @@ export default function SolarWatch({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setNoticeError("Systemnotiser stöds inte här. Varningen visas i appen.");
     }
-  }, [live, warning, permission, id, shadowAt, result, place]);
+  }, [live, warning, permission, id, shadowAt, result, place, t]);
   if (!place) return null;
   const recommendations =
     result && !pending
@@ -78,63 +83,72 @@ export default function SolarWatch({
     <section
       className={`solar-watch ${warning ? "urgent" : ""}`}
       id="sun-watch"
-      aria-label="Solbevakning"
+      aria-label={t("Solbevakning")}
     >
       <div className="watch-heading">
         <Bell size={18} />
         <strong>
-          {live ? "Följer din sittplats" : "Förhandsvisning vid vald tid"} ·{" "}
-          {place.name}
+          {live ? t("Följer din sittplats") : t("Förhandsvisning vid vald tid")}{" "}
+          · {place.name}
         </strong>
         <button
           className="icon-button"
           onClick={onStop}
-          aria-label="Avsluta solbevakning"
+          aria-label={t("Avsluta solbevakning")}
         >
           <X size={17} />
         </button>
       </div>
       <p role="status">
         {pending
-          ? "Beräknar skuggans ankomst…"
+          ? t("Beräknar skuggans ankomst…")
           : warning
-            ? `Skuggan når din punkt om cirka ${result.until} minuter (${clock(new Date(shadowAt))}).`
-            : solarLabel(result)}
+            ? t("Skuggan når din punkt om cirka {0} minuter ({1}).", [
+                result.until,
+                clock(new Date(shadowAt)),
+              ])
+            : t(solarLabel(result))}
       </p>
       {result?.pointSource !== "chosen" && (
         <p>
-          Utomhuspunkten är uppskattad. Välj din sittplats på kartan före en
-          verklig bevakning.
+          {t(
+            "Utomhuspunkten är uppskattad. Välj din sittplats på kartan före en verklig bevakning.",
+          )}
         </p>
       )}
       <div className="watch-actions">
-        {!live && <button onClick={onLive}>Följ klockan nu</button>}
+        {!live && <button onClick={onLive}>{t("Följ klockan nu")}</button>}
         {live && permission === "default" && (
-          <button onClick={enable}>Aktivera systemnotiser</button>
+          <button onClick={enable}>{t("Aktivera systemnotiser")}</button>
         )}
         <span>
           {live
-            ? "Bevakning medan appen är öppen."
-            : "Dra tidsreglaget för att prova varningen."}
+            ? t("Bevakning medan appen är öppen.")
+            : t("Dra tidsreglaget för att prova varningen.")}
         </span>
       </div>
       {permission === "denied" && live && (
-        <small>Systemnotiser är blockerade. Varningen visas här i appen.</small>
+        <small>
+          {t("Systemnotiser är blockerade. Varningen visas här i appen.")}
+        </small>
       )}
-      {noticeError && <small>{noticeError}</small>}
+      {noticeError && <small>{t(noticeError)}</small>}
       <h3>
         <Sun size={15} />
-        Nästa soliga{" "}
-        {place.category === "bar"
-          ? "bar"
-          : place.category === "restaurant"
-            ? "restaurang"
-            : "plats"}{" "}
-        i närheten
+        {t("Nästa soliga")}{" "}
+        {t(
+          place.category === "bar"
+            ? "bar"
+            : place.category === "restaurant"
+              ? "restaurang"
+              : "plats",
+        )}{" "}
+        {t("i närheten")}
       </h3>
       <p className="watch-explainer">
-        Sol efter uppskattad gångtid och under {durationLabel(duration)}.
-        Modellförslag, utan träd eller moln.
+        {t("Sol efter uppskattad gångtid och under ")}
+        {durationLabel(duration)}
+        {t(". Modellförslag, utan träd eller moln.")}
       </p>
       <div className="next-places">
         {recommendations.map(
@@ -143,13 +157,17 @@ export default function SolarWatch({
               <strong>{p.name}</strong>
               <span>
                 <Footprints size={13} />
-                ca {walk} min · {distance} m fågelvägen
+                {t("ca ")}
+                {walk}
+                {t(" min · ")}
+                {distance}
+                {t(" m fågelvägen")}
               </span>
               <small>
-                {opening.label} ·{" "}
+                {t(opening.label)} ·{" "}
                 {pointSource === "chosen"
-                  ? "vald punkt"
-                  : "sittplats ej verifierad"}
+                  ? t("vald punkt")
+                  : t("sittplats ej verifierad")}
               </small>
             </button>
           ),
@@ -157,8 +175,9 @@ export default function SolarWatch({
       </div>
       {!pending && !recommendations.length && (
         <p>
-          Inga alternativ med tillräcklig beräknad sol hittades inom 1,5 km.
-          Prova en kortare vistelse.
+          {t(
+            "Inga alternativ med tillräcklig beräknad sol hittades inom 1,5 km. Prova en kortare vistelse.",
+          )}
         </p>
       )}
     </section>
